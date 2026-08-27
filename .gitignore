@@ -12,3 +12,7 @@ input_data/
 
 # OS cruft
 .DS_Store
+
+# micromamba environment (not code, don't commit)
+bin/
+micromamba/
