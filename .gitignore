@@ -1,0 +1,14 @@
+# Secrets -- never commit
+.env
+
+# Environment / cache
+.venv/
+__pycache__/
+*.pyc
+
+# Data (large, region-specific -- lives on the workstation project store, not git)
+raw_data/
+input_data/
+
+# OS cruft
+.DS_Store
