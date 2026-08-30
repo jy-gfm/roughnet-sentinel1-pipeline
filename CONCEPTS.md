@@ -967,6 +967,17 @@ reminder that "windowed read succeeded" isn't sufficient on its own to
 confirm real data; checking the values (not just the shape/dtype) is what
 actually confirms it.
 
+**Patch extraction result (2026-08-30), `notebooks/pcrtc/02_patch_extraction.ipynb`**:
+100% match rate against `lidar_patches_tuk_tessa` -- **1676/1676 LiDAR
+patches matched, 0 skipped (out-of-bounds/wrong-size), 0 skipped
+(excess NaN)**, every patch has all 7 timesteps, `finite_frac=1.0` and
+`nonzero_frac=1.0` on every band. This is a real, attributable data-quality
+advantage over the raw-SAFE path (which has to work around the
+EPSG:6931-vs-UTM8N CRS mismatch and its footprint-rotation/inflation
+issue from Question 1) -- not just "coverage exists," but a materially
+cleaner match than the existing baseline's own data preparation achieved.
+Output: `s1_patches_tuk_pcrtc/`, ready for `03_train_baseline.ipynb`.
+
 **Status**: coverage and read-access are confirmed for Tuktoyaktuk.
 Turning this into an actual ablation (comparable to notebooks 08/09/10/12)
 would require a new patch-extraction step -- windowed-reading each LiDAR
