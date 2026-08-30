@@ -917,14 +917,31 @@ likely does not cover Pond Inlet or Cambridge Bay (EW-only sites),
 needs confirming against those AOIs specifically before assuming either
 way.
 
-`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` resolves the
+`notebooks/pcrtc/01_acquisition_coverage_check.ipynb` resolves the
 first open question -- does the collection actually have coverage for
 Tuktoyaktuk in the LiDAR survey date window, confirmed via a real windowed
 read, not just a catalogue hit. It reuses notebook 01's
 `aoi_from_lidar_patches` verbatim so the queried footprint is identical to
 the existing CDSE query, making any difference in results attributable to
-the data source, not AOI drift. Full patch-extraction/retraining against
-this data source is a follow-up step, contingent on this check passing.
+the data source, not AOI drift.
+
+This is the start of a dedicated `notebooks/pcrtc/` sub-sequence (numbered
+01/02/03, mirroring the original 01->04 acquisition-to-training structure
+but as its own clearly-separated experiment track): `01` is this coverage
+check, `02_patch_extraction.ipynb` merges VV+VH into local per-date
+GeoTIFFs and reuses notebook 06's `build_s1_products_from_corrected`/
+`extract_lidar_matched_s1_patches` verbatim to produce
+`s1_patches_tuk_pcrtc` in the same directory format the existing
+`LidarS1Dataset` expects, and `03_train_baseline.ipynb` is an exact copy
+of `04_train_s1_with_tessa_baseline.ipynb` with only `S1_DIR` (and
+checkpoint/output filenames) changed -- same architecture, same
+zero-filled attrs, same repeated-channel handling, so any metric
+difference from notebook 04 is attributable specifically to the data
+source's calibration/terrain-correction quality, not a different
+experimental setup. Matched against `lidar_patches_tuk_tessa` (the same
+LiDAR patches the actual baseline and Phase 1 use), which conveniently
+shares this PC data's CRS (EPSG:32608), avoiding the rotation/footprint-
+inflation issue from Question 1 that affects the raw-SAFE path.
 
 **Result (2026-08-30): coverage confirmed, end to end.** Catalogue search
 found 7 `sentinel-1-rtc` scenes for Tuktoyaktuk within the same +/-30-day

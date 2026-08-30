@@ -110,7 +110,7 @@ switch entirely to Planetary Computer?
 **Update, 2026-08-30**: Tom's email confirmed this is worth trying and
 flagged that the collection looks IW-mode only (fine for Tuktoyaktuk, not
 for Pond Inlet/Cambridge Bay). Ran
-`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` to check (1)
+`notebooks/pcrtc/01_acquisition_coverage_check.ipynb` to check (1)
 above -- **confirmed**: 7 scenes found for Tuktoyaktuk in the same
 +/-30-day window as my existing CDSE query (vs. CDSE's 8 for the identical
 AOI), all IW/ascending with `vv`/`vh` assets, and a windowed read of the
