@@ -744,3 +744,38 @@ necessary if none of Phase 1's preprocessing changes meaningfully close
 the gap -- at that point the evidence would point at the architecture
 itself, not the preprocessing, as the bottleneck. See
 `TODO_next_experiments.md` for the full phase breakdown.
+
+## Considered-but-deferred: Microsoft Planetary Computer RTC data (2026-08-30)
+
+Planetary Computer's `sentinel-1-rtc` collection provides **radiometric
+terrain correction** (DEM-based correction for local incidence angle,
+layover, and shadow effects from terrain slope). This is a different axis
+of data quality from anything currently being tested in Phase 1:
+
+- **Despeckling (1.3)** tests grainy, multiplicative *noise*.
+- **RTC** would fix *geometric/radiometric distortion from terrain slope*
+  in the current raw-SAFE calibration path, which does sigma-nought
+  calibration and GCP-based warping but explicitly skips terrain
+  correction (see `QUESTIONS_FOR_MICHEL.md`, item 6).
+
+Both could plausibly matter independently, but they're not the same
+hypothesis and one experiment doesn't stand in for the other.
+
+**Why not added to the current sprint:** switching data sources isn't a
+preprocessing tweak like 08/09/10/12 (a code change inside
+`LidarS1Dataset`) -- it's a new acquisition pipeline: query Planetary
+Computer's STAC API, confirm actual coverage exists for Tuktoyaktuk in
+the relevant date range (unconfirmed -- see `QUESTIONS_FOR_MICHEL.md`
+item 6), download, then redo collocation/patching against the existing
+LiDAR patches. That's closer to redoing notebooks 01-03 for a new source
+than a same-day addition, and doesn't fit the 2-day Phase 1 + Phase 3
+timeline.
+
+**Decision:** kept as the open supervisor question it already was
+(`QUESTIONS_FOR_MICHEL.md` item 6), to be raised as the natural next step
+if Phase 1's ablations (native2ch, realattrs, despeckled, combined) don't
+meaningfully close the gap -- at that point there'd be a clear, ranked set
+of candidate explanations to bring to a supervisor meeting: (a)
+architecture doesn't suit SAR (Phase 2), (b) input data's terrain-
+correction quality (this Planetary Computer path), (c) something not yet
+identified.
