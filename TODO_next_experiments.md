@@ -207,6 +207,21 @@ Phase 2 scope. Full metrics table and interpretation in `CONCEPTS.md`'s
 
 ---
 
+## Phase 2 status (2026-08-30): paused pending supervisor input
+
+Deadline confirmed as 2026-09-15 (not the earlier "10 days" estimate), so
+there's real room to attempt a new architecture layer if it's worth it --
+but the decision on *which* layer (a cheap polarization-ratio feature vs.
+a genuinely new learned module, e.g. a speckle-aware non-local block) is
+being deferred until after Phase 4 (Planetary Computer) finishes and
+Michel has weighed in. Plan: finish `pcrtc/03`/`pcrtc/04`, run the
+uncertainty/calibration check on the best resulting checkpoint, then email
+Michel with the combined results asking (1) to review results and suggest
+further preprocessing directions, (2) whether the confidence-map approach
+matches his intent, (3) whether a new architecture layer is worth training
+and what baseline he'd want it compared against. Sketches for both layer
+options are still below for reference once a direction is confirmed.
+
 ## Phase 2: New model -- SAR-specific layer(s) on top of Tessa's architecture
 
 Rather than another input-adapter ablation, this phase adds a genuinely
