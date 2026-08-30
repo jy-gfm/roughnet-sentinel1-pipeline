@@ -813,6 +813,35 @@ architecture layer) or the deferred Planetary Computer RTC path (below) as
 the next candidate explanations — contingent on time remaining after the
 2-day Phase 1 + Phase 3 sprint and the dissertation-writing deadline.
 
+## Phase 3 result: uncertainty/confidence map calibration (2026-08-30)
+
+Ensemble sampling (`N_SAMPLES=5`, `N_CALIBRATION_PATCHES=40`) on the best
+Phase 1 checkpoint (`s1_tuk_native2ch_realattrs_unet_best.pth`) gives a
+**pixel-level correlation between predicted std and `|error|` of 0.2570**.
+
+**Interpretation**: positive but weak (r^2 ~ 0.066, ~7% of error variance
+explained). The map is not random -- higher ensemble disagreement does
+correspond, on average, to higher actual error -- but it's not strong
+enough to use as a standalone per-pixel trust signal. This lines up with
+the GT-vs-pred-std scatter already recorded for this same checkpoint
+(R^2=0.424, best-fit line well below the 1:1 line, in the Phase 1 results
+summary above): the model's predicted spread is systematically compressed
+relative to ground truth, which narrows the dynamic range `pred_std` has
+available to track error magnitude, even though the underlying
+relationship it's trying to capture is real.
+
+**Why this isn't a failure, and how to frame it in the write-up**:
+ensemble sampling variance from a diffusion model's stochastic sampler
+captures *generative/output* uncertainty (variability in what the sampler
+produces across random seeds), not full *epistemic* uncertainty (from the
+model's learned weights/parameters) -- this distinction was flagged before
+running the experiment (`TODO_next_experiments.md`, Phase 3). A
+weak-but-positive calibration for that specific, narrower kind of
+uncertainty estimate is a defensible, literature-consistent result, not a
+broken method. **Conclusion**: the confidence map is directionally
+informative but should be presented as a supplementary diagnostic, not a
+substitute for validating predictions against ground truth.
+
 ## Considered-but-deferred: Microsoft Planetary Computer RTC data (2026-08-30)
 
 Planetary Computer's `sentinel-1-rtc` collection provides **radiometric
