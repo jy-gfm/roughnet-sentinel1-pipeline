@@ -267,6 +267,32 @@ ensemble on a handful of example patches (reuse the existing
 `example_patches` mechanism from notebook 04) for the visual confidence
 map, not on the entire validation set.
 
+### 3.1/3.2. Result -- DONE (2026-08-30)
+
+Ran on the best Phase 1 checkpoint (`s1_tuk_native2ch_realattrs_unet_best.pth`,
+notebook 12's combined result), `N_SAMPLES=5`, `N_CALIBRATION_PATCHES=40`.
+
+**Pixel-level correlation between predicted std and |error|: 0.2570.**
+
+Positive, so the confidence map is not random -- pixels where the ensemble
+disagrees with itself do tend to be pixels where the prediction is
+actually wrong. But r=0.257 is weak (r^2 ~ 0.066, ~7% of error variance
+explained), not moderate or strong. Consistent with the GT-vs-pred-std
+scatter from notebook 12's own evaluation (R^2=0.424, best-fit line well
+below the 1:1 line): `pred_std` is systematically compressed relative to
+ground truth, so the map's dynamic range is too narrow to strongly track
+error magnitude even though the underlying relationship is real.
+
+**Conclusion for the write-up**: the confidence map is directionally
+informative but not reliable enough to use as a standalone trust signal --
+useful as a supplementary diagnostic, not a substitute for validating
+against ground truth. This is expected, not a failure: ensemble sampling
+variance captures generative/output uncertainty from the stochastic
+sampler, not full epistemic (model-weight) uncertainty -- a weak-but-real
+correlation is a defensible, literature-consistent result for that kind of
+uncertainty estimate. Saved to
+`s1_tuk_native2ch_realattrs_uncertainty_calibration.json`.
+
 ### 3.2. Check calibration before trusting the map
 
 The map is only meaningful if uncertainty correlates with actual error.

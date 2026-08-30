@@ -813,6 +813,58 @@ architecture layer) or the deferred Planetary Computer RTC path (below) as
 the next candidate explanations — contingent on time remaining after the
 2-day Phase 1 + Phase 3 sprint and the dissertation-writing deadline.
 
+## Phase 3 result: uncertainty/confidence map calibration (2026-08-30)
+
+Ensemble sampling (`N_SAMPLES=5`, `N_CALIBRATION_PATCHES=40`) on the best
+Phase 1 checkpoint (`s1_tuk_native2ch_realattrs_unet_best.pth`) gives a
+**pixel-level correlation between predicted std and `|error|` of 0.2570**.
+
+**Interpretation**: positive but weak (r^2 ~ 0.066, ~7% of error variance
+explained). The map is not random -- higher ensemble disagreement does
+correspond, on average, to higher actual error -- but it's not strong
+enough to use as a standalone per-pixel trust signal. This lines up with
+the GT-vs-pred-std scatter already recorded for this same checkpoint
+(R^2=0.424, best-fit line well below the 1:1 line, in the Phase 1 results
+summary above): the model's predicted spread is systematically compressed
+relative to ground truth, which narrows the dynamic range `pred_std` has
+available to track error magnitude, even though the underlying
+relationship it's trying to capture is real.
+
+**Visual confirmation, from the reconstruction-grid figure (6 example
+patches, rows: GT LiDAR / Pred Mean / Error / Uncertainty (std))**: the
+Uncertainty (std) row shows genuine, non-uniform spatial texture (roughly
+0.05m in calm regions up to 0.25-0.35m in rougher ones), and it visibly
+tracks the Error row on a per-patch basis -- e.g. patch 12597 has both
+higher error texture and a brighter, more patchy uncertainty map, while
+patches 13279/13184 show low error and correspondingly darker, more
+uniform low uncertainty. This is a qualitative illustration of the same
+weak-but-real r=0.257 relationship measured quantitatively above -- visible
+by eye, not just in the aggregate statistic.
+
+**Known display bug in this same figure, not a data/metric problem**: the
+GT LiDAR and Pred Mean rows render as solid, uniform blue blocks with no
+visible texture. This is the identical plotting issue already diagnosed
+and fixed for notebook 08's reconstruction grid: both rows plot absolute
+elevation (roughly -6 to -7m for this region) on a colormap centered at
+zero, so the values saturate to a single color. It does not affect any
+saved metric (RMSE, ZNCC, the calibration correlation, etc.) or the
+Uncertainty/Error rows, which are already display-correct -- it only makes
+the GT/Pred rows unreadable. Fix, not yet applied to notebook 11: recenter
+each patch around its own masked mean before plotting, the same fix used
+for notebook 08.
+
+**Why this isn't a failure, and how to frame it in the write-up**:
+ensemble sampling variance from a diffusion model's stochastic sampler
+captures *generative/output* uncertainty (variability in what the sampler
+produces across random seeds), not full *epistemic* uncertainty (from the
+model's learned weights/parameters) -- this distinction was flagged before
+running the experiment (`TODO_next_experiments.md`, Phase 3). A
+weak-but-positive calibration for that specific, narrower kind of
+uncertainty estimate is a defensible, literature-consistent result, not a
+broken method. **Conclusion**: the confidence map is directionally
+informative but should be presented as a supplementary diagnostic, not a
+substitute for validating predictions against ground truth.
+
 ## Considered-but-deferred: Microsoft Planetary Computer RTC data (2026-08-30)
 
 Planetary Computer's `sentinel-1-rtc` collection provides **radiometric
@@ -865,11 +917,62 @@ likely does not cover Pond Inlet or Cambridge Bay (EW-only sites),
 needs confirming against those AOIs specifically before assuming either
 way.
 
-`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` resolves the
+`notebooks/pcrtc/01_acquisition_coverage_check.ipynb` resolves the
 first open question -- does the collection actually have coverage for
 Tuktoyaktuk in the LiDAR survey date window, confirmed via a real windowed
 read, not just a catalogue hit. It reuses notebook 01's
 `aoi_from_lidar_patches` verbatim so the queried footprint is identical to
 the existing CDSE query, making any difference in results attributable to
-the data source, not AOI drift. Full patch-extraction/retraining against
-this data source is a follow-up step, contingent on this check passing.
+the data source, not AOI drift.
+
+This is the start of a dedicated `notebooks/pcrtc/` sub-sequence (numbered
+01/02/03, mirroring the original 01->04 acquisition-to-training structure
+but as its own clearly-separated experiment track): `01` is this coverage
+check, `02_patch_extraction.ipynb` merges VV+VH into local per-date
+GeoTIFFs and reuses notebook 06's `build_s1_products_from_corrected`/
+`extract_lidar_matched_s1_patches` verbatim to produce
+`s1_patches_tuk_pcrtc` in the same directory format the existing
+`LidarS1Dataset` expects, and `03_train_baseline.ipynb` is an exact copy
+of `04_train_s1_with_tessa_baseline.ipynb` with only `S1_DIR` (and
+checkpoint/output filenames) changed -- same architecture, same
+zero-filled attrs, same repeated-channel handling, so any metric
+difference from notebook 04 is attributable specifically to the data
+source's calibration/terrain-correction quality, not a different
+experimental setup. Matched against `lidar_patches_tuk_tessa` (the same
+LiDAR patches the actual baseline and Phase 1 use), which conveniently
+shares this PC data's CRS (EPSG:32608), avoiding the rotation/footprint-
+inflation issue from Question 1 that affects the raw-SAFE path.
+
+**Result (2026-08-30): coverage confirmed, end to end.** Catalogue search
+found 7 `sentinel-1-rtc` scenes for Tuktoyaktuk within the same +/-30-day
+window as the CDSE query (vs. CDSE's own count of 8 for the identical
+AOI/window -- consistent, not a different subset of acquisitions; all
+S1A, IW mode, ascending orbit, `vv`/`vh` assets present). A windowed read
+of the actual AOI footprint (not the scene's raw top-left corner, which
+returned nodata on the first attempt -- see below) returned real
+gamma-nought backscatter: min/max 0.00136-0.2706 (linear power), 0%
+nodata in the window -- a physically plausible range, comparable order of
+magnitude to the raw-SAFE VV values already validated elsewhere in this
+document (mean ~=0.022).
+
+**Bug caught during this check, worth noting**: the first windowed-read
+attempt read `Window(0, 0, 512, 512)` -- the scene's top-left corner --
+and returned a constant `-32768.0` (the int16 nodata sentinel), because
+GRD scenes are stored as an axis-aligned bounding box around an angled
+swath, so raster corners commonly fall outside the actual imaged area.
+Fixed by transforming the AOI's bounding box into the scene's CRS
+(`rasterio.warp.transform_bounds`) and reading that specific window
+(`rasterio.windows.from_bounds`) instead of an arbitrary corner -- a
+reminder that "windowed read succeeded" isn't sufficient on its own to
+confirm real data; checking the values (not just the shape/dtype) is what
+actually confirms it.
+
+**Status**: coverage and read-access are confirmed for Tuktoyaktuk.
+Turning this into an actual ablation (comparable to notebooks 08/09/10/12)
+would require a new patch-extraction step -- windowed-reading each LiDAR
+patch's footprint from these COGs, analogous to notebooks 02/03's raw-SAFE
+patching -- plus a new training/eval notebook. That's a genuine new
+pipeline component, not a same-day addition; whether to build it now
+versus document this as a confirmed-but-deferred result and move to
+writing is a time-budget decision, not a methodology one, given the
+dissertation deadline.
