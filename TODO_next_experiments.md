@@ -18,6 +18,32 @@ weaker spatial correlation. This roadmap has three phases, in order:
 
 See `CONCEPTS.md` for full background and the S1-vs-S2 comparison table.
 
+## Phase 4 (added 2026-08-30): Planetary Computer RTC data source
+
+A fourth track, started after Michel/Tom suggested it directly: does
+switching the *data source itself* (terrain-corrected RTC backscatter
+instead of the raw-SAFE calibration path, which has no DEM-based terrain
+correction) close the gap, independent of any preprocessing/architecture
+change? Lives in `notebooks/pcrtc/`, its own numbered sub-sequence:
+
+- `01_acquisition_coverage_check.ipynb` -- DONE. Confirmed real coverage
+  for Tuktoyaktuk (7 scenes, real backscatter, 0% nodata).
+- `02_patch_extraction.ipynb` -- DONE. 100% match rate against Tessa's
+  1676 LiDAR patches, 0 skipped, perfect per-band quality -- cleaner than
+  the raw-SAFE path, attributable to sharing Tessa's patches' CRS
+  (EPSG:32608), avoiding Question 1's rotation/inflation issue.
+- `03_train_baseline.ipynb` -- IN PROGRESS. Exact copy of
+  `04_train_s1_with_tessa_baseline.ipynb`'s config (repeated channels,
+  zero-filled attrs) with only the data source changed, isolating the
+  data-source variable specifically.
+- `04_train_native2ch_realattrs.ipynb` -- built, not yet run. Mirrors
+  notebook 12's combination (best Phase 1 result, ZNCC=0.204) on top of
+  this data source, to test whether that interaction transfers or whether
+  data quality alone already captures most of the benefit.
+
+See `CONCEPTS.md`'s Planetary Computer sections for full results as they
+land.
+
 ---
 
 ## Phase 1: Interface-level ablations
