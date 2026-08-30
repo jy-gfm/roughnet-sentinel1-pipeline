@@ -847,3 +847,29 @@ of candidate explanations to bring to a supervisor meeting: (a)
 architecture doesn't suit SAR (Phase 2), (b) input data's terrain-
 correction quality (this Planetary Computer path), (c) something not yet
 identified.
+
+**Update (2026-08-30): no longer deferred.** Michel (via his postdoc Tom)
+independently suggested this exact path by email, confirming it addresses
+a real gap: the current raw-SAFE calibration does sigma-nought calibration
+and GCP warping but no DEM-based terrain correction, whereas Planetary
+Computer's `sentinel-1-rtc` collection provides gamma-nought backscatter
+with real 10m-DEM terrain correction, validated by Microsoft against an
+independent RTC implementation (`sarsen`). It also removes the ~1hr/product
+raw-SAFE processing cost entirely via windowed HTTPS reads against
+cloud-optimized GeoTIFFs -- no download, no local calibration.
+
+One caveat from Michel's email, consistent with what this document already
+flagged: the collection appears to be **IW-mode only** (every example
+found follows `S1A_IW_GRDH` naming) -- good for Tuktoyaktuk (IW), but
+likely does not cover Pond Inlet or Cambridge Bay (EW-only sites),
+needs confirming against those AOIs specifically before assuming either
+way.
+
+`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` resolves the
+first open question -- does the collection actually have coverage for
+Tuktoyaktuk in the LiDAR survey date window, confirmed via a real windowed
+read, not just a catalogue hit. It reuses notebook 01's
+`aoi_from_lidar_patches` verbatim so the queried footprint is identical to
+the existing CDSE query, making any difference in results attributable to
+the data source, not AOI drift. Full patch-extraction/retraining against
+this data source is a follow-up step, contingent on this check passing.

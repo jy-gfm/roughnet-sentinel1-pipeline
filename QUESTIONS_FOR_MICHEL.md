@@ -107,6 +107,12 @@ collection actually have coverage for Tuktoyaktuk in this date range, and
 (2) is "try both and compare" the right scope, or would you rather I just
 switch entirely to Planetary Computer?
 
+**Update, 2026-08-30**: Tom's email confirmed this is worth trying and
+flagged that the collection looks IW-mode only (fine for Tuktoyaktuk, not
+for Pond Inlet/Cambridge Bay). Running
+`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` now to confirm
+(1) above with a real windowed read, not just a catalogue search hit.
+
 ## 7. Scope — Tuktoyaktuk only, or extend to Pond Inlet / Cambridge Bay?
 
 Your diagnostic notebook found **zero** `IW_GRDH_1S` products for Pond
