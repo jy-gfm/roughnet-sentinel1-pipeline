@@ -40,6 +40,18 @@ change? Lives in `notebooks/pcrtc/`, its own numbered sub-sequence:
   notebook 12's combination (best Phase 1 result, ZNCC=0.204) on top of
   this data source, to test whether that interaction transfers or whether
   data quality alone already captures most of the benefit.
+- `05_train_native2ch.ipynb` / `06_train_realattrs.ipynb` -- built, not
+  yet run (added 2026-08-30 once the 2026-09-15 deadline was confirmed,
+  giving enough room for the full factorial). Mirror notebooks 08/09's
+  isolation of each factor individually, completing a
+  baseline/native2ch/realattrs/combined 2x2 on this data source -- lets
+  the final comparison table show whether the same interaction pattern
+  found on raw-SAFE data (native2ch helps alone, realattrs doesn't,
+  combined helps most) holds on cleaner terrain-corrected data too, or
+  looks different once the underlying data quality changes.
+
+Run order given single-GPU constraint: 03 -> 04 -> 05 -> 06 (or any order,
+since none depend on each other -- just not concurrently).
 
 See `CONCEPTS.md`'s Planetary Computer sections for full results as they
 land.
