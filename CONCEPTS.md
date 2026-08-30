@@ -925,3 +925,37 @@ read, not just a catalogue hit. It reuses notebook 01's
 the existing CDSE query, making any difference in results attributable to
 the data source, not AOI drift. Full patch-extraction/retraining against
 this data source is a follow-up step, contingent on this check passing.
+
+**Result (2026-08-30): coverage confirmed, end to end.** Catalogue search
+found 7 `sentinel-1-rtc` scenes for Tuktoyaktuk within the same +/-30-day
+window as the CDSE query (vs. CDSE's own count of 8 for the identical
+AOI/window -- consistent, not a different subset of acquisitions; all
+S1A, IW mode, ascending orbit, `vv`/`vh` assets present). A windowed read
+of the actual AOI footprint (not the scene's raw top-left corner, which
+returned nodata on the first attempt -- see below) returned real
+gamma-nought backscatter: min/max 0.00136-0.2706 (linear power), 0%
+nodata in the window -- a physically plausible range, comparable order of
+magnitude to the raw-SAFE VV values already validated elsewhere in this
+document (mean ~=0.022).
+
+**Bug caught during this check, worth noting**: the first windowed-read
+attempt read `Window(0, 0, 512, 512)` -- the scene's top-left corner --
+and returned a constant `-32768.0` (the int16 nodata sentinel), because
+GRD scenes are stored as an axis-aligned bounding box around an angled
+swath, so raster corners commonly fall outside the actual imaged area.
+Fixed by transforming the AOI's bounding box into the scene's CRS
+(`rasterio.warp.transform_bounds`) and reading that specific window
+(`rasterio.windows.from_bounds`) instead of an arbitrary corner -- a
+reminder that "windowed read succeeded" isn't sufficient on its own to
+confirm real data; checking the values (not just the shape/dtype) is what
+actually confirms it.
+
+**Status**: coverage and read-access are confirmed for Tuktoyaktuk.
+Turning this into an actual ablation (comparable to notebooks 08/09/10/12)
+would require a new patch-extraction step -- windowed-reading each LiDAR
+patch's footprint from these COGs, analogous to notebooks 02/03's raw-SAFE
+patching -- plus a new training/eval notebook. That's a genuine new
+pipeline component, not a same-day addition; whether to build it now
+versus document this as a confirmed-but-deferred result and move to
+writing is a time-budget decision, not a methodology one, given the
+dissertation deadline.

@@ -109,9 +109,17 @@ switch entirely to Planetary Computer?
 
 **Update, 2026-08-30**: Tom's email confirmed this is worth trying and
 flagged that the collection looks IW-mode only (fine for Tuktoyaktuk, not
-for Pond Inlet/Cambridge Bay). Running
-`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` now to confirm
-(1) above with a real windowed read, not just a catalogue search hit.
+for Pond Inlet/Cambridge Bay). Ran
+`notebooks/13_planetary_computer_rtc_coverage_check.ipynb` to check (1)
+above -- **confirmed**: 7 scenes found for Tuktoyaktuk in the same
++/-30-day window as my existing CDSE query (vs. CDSE's 8 for the identical
+AOI), all IW/ascending with `vv`/`vh` assets, and a windowed read of the
+actual AOI returned real gamma-nought backscatter (0.0014-0.27, 0%
+nodata) -- so coverage and data access both check out for Tuktoyaktuk.
+Still deciding whether to build the full patch-extraction/retraining
+comparison given the time left, or document this as confirmed-viable and
+treat it as future work in the write-up -- your read on which is the
+better use of remaining time would help.
 
 ## 7. Scope — Tuktoyaktuk only, or extend to Pond Inlet / Cambridge Bay?
 
