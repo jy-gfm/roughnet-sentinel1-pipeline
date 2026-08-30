@@ -719,6 +719,46 @@ variation being removed" — a null result from this experiment could mean
 either "speckle wasn't the bottleneck" or "the filter removed real signal
 along with the noise," and this ablation alone can't tell those apart.
 
+## Comparison against a published SAR preprocessing pipeline (2026-08-30)
+
+"An ensemble learning method to retrieve sea ice roughness from
+Sentinel-1 SAR images" documents a 5-step SNAP-based preprocessing
+pipeline: (1) apply orbit file, (2) thermal noise removal, (3) calibrate
+to NRCS (sigma-nought), (4) speckle filtering with the **Refined Lee
+filter** (7x7 window), (5) convert to dB. Comparing against this
+project's two pipelines:
+
+| Step | Raw-SAFE pipeline (01/03) | Planetary Computer RTC |
+|---|---|---|
+| Apply orbit file | Not documented as a step | Very likely included in Microsoft's RTC processing (standard for a production product), not independently confirmed |
+| Thermal noise removal | Not documented as a step | Same caveat as above |
+| Calibrate to NRCS | Yes -- matches | Yes -- matches |
+| Speckle filtering | Different method, negative result -- plain 5x5 median filter (notebook 10), not edge-preserving, made ZNCC/RMSE worse | Not applied |
+| Convert to dB | Yes -- matches | Yes -- matches |
+
+**Two takeaways:**
+
+1. **The raw-SAFE calibration path likely omits two standard steps**
+   (orbit-file correction, thermal noise removal) that this published
+   pipeline treats as baseline necessities. This strengthens the Phase 4
+   finding (PC-RTC baseline beating every raw-SAFE fix, `ZNCC=0.286` vs.
+   `0.204`) with a mechanistic explanation beyond just terrain correction:
+   a properly-processed product likely bundles several calibration steps
+   the DIY path skips, not just DEM-based terrain correction. Worth
+   confirming against Planetary Computer's own product documentation
+   rather than assuming, but it's the reasonable expectation for a
+   production RTC product.
+2. **This is concrete literature support for revisiting despeckling with
+   the right method.** The paper's own justification for using Refined
+   Lee is exactly the concern already raised in Question 8: it "averages
+   the image while preserving edges, so the patterns of sea ice will not
+   be affected." That edge-awareness is precisely what a plain median
+   filter lacks -- it can't distinguish "smoothing out speckle" from
+   "smoothing out a real ridge boundary," which is the most likely
+   explanation for notebook 10's negative result. If despeckling gets
+   revisited, Refined Lee (not another flat filter) is the well-supported
+   next thing to try, per Michel's own reply to Question 8's addendum.
+
 ## What Phase 1 (notebooks 08/09/10) actually is, in one paragraph
 
 All three notebooks use Tessa's **identical, unmodified architecture** --

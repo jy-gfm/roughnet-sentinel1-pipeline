@@ -173,6 +173,16 @@ proper adaptive despeckling method (Lee/Frost/Refined Lee) might behave
 differently, or whether this result is answer enough not to pursue it
 further given the time left.
 
+**Literature note, added 2026-08-30**: found direct support for this in
+"An ensemble learning method to retrieve sea ice roughness from
+Sentinel-1 SAR images" — they use the Refined Lee filter specifically
+because it "averages the image while preserving edges, so the patterns
+of sea ice will not be affected." That's exactly the property my flat
+median filter lacks, and the most likely explanation for why it hurt
+rather than helped. If you think it's worth one more try given the time
+left, Refined Lee (not another flat filter) is the well-supported next
+step.
+
 ## Terminology reference
 
 **Sigma-nought (σ⁰)**: the standard physical unit for radar backscatter —
