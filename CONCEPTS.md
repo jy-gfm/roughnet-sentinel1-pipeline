@@ -967,6 +967,65 @@ reminder that "windowed read succeeded" isn't sufficient on its own to
 confirm real data; checking the values (not just the shape/dtype) is what
 actually confirms it.
 
+**Patch extraction result (2026-08-30), `notebooks/pcrtc/02_patch_extraction.ipynb`**:
+100% match rate against `lidar_patches_tuk_tessa` -- **1676/1676 LiDAR
+patches matched, 0 skipped (out-of-bounds/wrong-size), 0 skipped
+(excess NaN)**, every patch has all 7 timesteps, `finite_frac=1.0` and
+`nonzero_frac=1.0` on every band. This is a real, attributable data-quality
+advantage over the raw-SAFE path (which has to work around the
+EPSG:6931-vs-UTM8N CRS mismatch and its footprint-rotation/inflation
+issue from Question 1) -- not just "coverage exists," but a materially
+cleaner match than the existing baseline's own data preparation achieved.
+Output: `s1_patches_tuk_pcrtc/`, ready for `03_train_baseline.ipynb`.
+
+**Baseline training result (2026-08-30), `notebooks/pcrtc/03_train_baseline.ipynb`**:
+this is the single most important Phase 4 result so far. Using the
+*simplest possible config* -- identical to `04_train_s1_with_tessa_baseline.ipynb`'s
+zero-filled attrs and repeated `[VV,VH,VV,VH]` channels, no Phase 1 fixes
+applied at all -- on Planetary Computer RTC data:
+
+| | RMSE (m) | ZNCC | JSD | PSD RMSE | Sigma Err % | Normal Angle |
+|---|---|---|---|---|---|---|
+| Raw-SAFE baseline (04) | 0.190 | 0.166 | 0.139 | 2.099 | 32.7% | 1.80 |
+| Best raw-SAFE combo (12, native2ch+realattrs) | 0.198 | 0.204 | 0.094 | 1.576 | 24.08% | 2.12 |
+| **PC-RTC baseline (03)** | **0.173** | **0.286** | 0.145 | 1.832 | 33.25% | **1.78** |
+| Tessa's Sentinel-2 (reference) | ~0.11-0.135 | ~0.74-0.78 | ~0.013-0.096 | ~0.6-0.86 | ~3-20% | ~1.5-2.1 |
+
+**The simplest config on this data source beats every Phase 1 preprocessing
+fix tried on the raw-SAFE data**, on both RMSE and ZNCC (0.286 vs. 0.204
+best-previous). This is strong evidence that data-source/terrain-correction
+quality was a bigger lever on the original gap than any interface-level
+preprocessing fix -- exactly the hypothesis Phase 4 was designed to test,
+and it comes back positive. Gap to Tessa's S2 narrows to roughly 2.6-2.7x
+(from ~3.7-4.5x with the best raw-SAFE result).
+
+**Not uniformly better, though** -- worth stating precisely:
+- **JSD is worse** (0.145 vs. 0.094 for the best raw-SAFE combo) -- the
+  predicted roughness *distribution* is less realistic even though
+  spatial pattern correlation (ZNCC) improved.
+- **PSD RMSE is worse** (1.832 vs. 1.576).
+- **Variance compression is worse, not better**: `pred_std=0.112` vs.
+  `gt_std=0.169` (ratio ~0.66), a more compressed spread than the best
+  raw-SAFE result's ratio (~0.84). Visible directly in the per-patch PDF
+  plots -- several predicted (red) distributions are narrower/shifted
+  from ground truth (blue).
+- The reconstruction grid itself displays correctly this time (GT/Pred
+  rows show real structure, not the solid-color plotting bug from
+  earlier) -- large-scale blue/red boundary patterns are visibly tracked
+  between GT and Pred in several example patches, consistent with the
+  higher ZNCC.
+
+**Interpretation**: terrain-correction quality improves *where* the model
+gets things right (spatial pattern, ZNCC) and *overall magnitude accuracy*
+(RMSE), but doesn't on its own fix *how confidently/how spread-out* the
+model's predictions are (JSD, PSD RMSE, variance compression) -- those
+look like a separate, still-unresolved limitation, possibly tied to the
+zero-filled attrs/repeated-channels config this baseline still uses.
+`pcrtc/04-06` (testing the same Phase 1 fixes on this cleaner data source)
+will show whether those interface-level fixes now also close the
+remaining JSD/PSD/variance gaps, the way they helped ZNCC on the raw-SAFE
+data.
+
 **Status**: coverage and read-access are confirmed for Tuktoyaktuk.
 Turning this into an actual ablation (comparable to notebooks 08/09/10/12)
 would require a new patch-extraction step -- windowed-reading each LiDAR

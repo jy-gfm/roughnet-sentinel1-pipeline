@@ -18,6 +18,44 @@ weaker spatial correlation. This roadmap has three phases, in order:
 
 See `CONCEPTS.md` for full background and the S1-vs-S2 comparison table.
 
+## Phase 4 (added 2026-08-30): Planetary Computer RTC data source
+
+A fourth track, started after Michel/Tom suggested it directly: does
+switching the *data source itself* (terrain-corrected RTC backscatter
+instead of the raw-SAFE calibration path, which has no DEM-based terrain
+correction) close the gap, independent of any preprocessing/architecture
+change? Lives in `notebooks/pcrtc/`, its own numbered sub-sequence:
+
+- `01_acquisition_coverage_check.ipynb` -- DONE. Confirmed real coverage
+  for Tuktoyaktuk (7 scenes, real backscatter, 0% nodata).
+- `02_patch_extraction.ipynb` -- DONE. 100% match rate against Tessa's
+  1676 LiDAR patches, 0 skipped, perfect per-band quality -- cleaner than
+  the raw-SAFE path, attributable to sharing Tessa's patches' CRS
+  (EPSG:32608), avoiding Question 1's rotation/inflation issue.
+- `03_train_baseline.ipynb` -- IN PROGRESS. Exact copy of
+  `04_train_s1_with_tessa_baseline.ipynb`'s config (repeated channels,
+  zero-filled attrs) with only the data source changed, isolating the
+  data-source variable specifically.
+- `04_train_native2ch_realattrs.ipynb` -- built, not yet run. Mirrors
+  notebook 12's combination (best Phase 1 result, ZNCC=0.204) on top of
+  this data source, to test whether that interaction transfers or whether
+  data quality alone already captures most of the benefit.
+- `05_train_native2ch.ipynb` / `06_train_realattrs.ipynb` -- built, not
+  yet run (added 2026-08-30 once the 2026-09-15 deadline was confirmed,
+  giving enough room for the full factorial). Mirror notebooks 08/09's
+  isolation of each factor individually, completing a
+  baseline/native2ch/realattrs/combined 2x2 on this data source -- lets
+  the final comparison table show whether the same interaction pattern
+  found on raw-SAFE data (native2ch helps alone, realattrs doesn't,
+  combined helps most) holds on cleaner terrain-corrected data too, or
+  looks different once the underlying data quality changes.
+
+Run order given single-GPU constraint: 03 -> 04 -> 05 -> 06 (or any order,
+since none depend on each other -- just not concurrently).
+
+See `CONCEPTS.md`'s Planetary Computer sections for full results as they
+land.
+
 ---
 
 ## Phase 1: Interface-level ablations
@@ -180,6 +218,21 @@ Phase 2 scope. Full metrics table and interpretation in `CONCEPTS.md`'s
 "Phase 1 final results summary" section.
 
 ---
+
+## Phase 2 status (2026-08-30): paused pending supervisor input
+
+Deadline confirmed as 2026-09-15 (not the earlier "10 days" estimate), so
+there's real room to attempt a new architecture layer if it's worth it --
+but the decision on *which* layer (a cheap polarization-ratio feature vs.
+a genuinely new learned module, e.g. a speckle-aware non-local block) is
+being deferred until after Phase 4 (Planetary Computer) finishes and
+Michel has weighed in. Plan: finish `pcrtc/03`/`pcrtc/04`, run the
+uncertainty/calibration check on the best resulting checkpoint, then email
+Michel with the combined results asking (1) to review results and suggest
+further preprocessing directions, (2) whether the confidence-map approach
+matches his intent, (3) whether a new architecture layer is worth training
+and what baseline he'd want it compared against. Sketches for both layer
+options are still below for reference once a direction is confirmed.
 
 ## Phase 2: New model -- SAR-specific layer(s) on top of Tessa's architecture
 
