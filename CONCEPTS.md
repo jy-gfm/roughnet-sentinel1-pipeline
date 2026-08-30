@@ -830,6 +830,29 @@ relative to ground truth, which narrows the dynamic range `pred_std` has
 available to track error magnitude, even though the underlying
 relationship it's trying to capture is real.
 
+**Visual confirmation, from the reconstruction-grid figure (6 example
+patches, rows: GT LiDAR / Pred Mean / Error / Uncertainty (std))**: the
+Uncertainty (std) row shows genuine, non-uniform spatial texture (roughly
+0.05m in calm regions up to 0.25-0.35m in rougher ones), and it visibly
+tracks the Error row on a per-patch basis -- e.g. patch 12597 has both
+higher error texture and a brighter, more patchy uncertainty map, while
+patches 13279/13184 show low error and correspondingly darker, more
+uniform low uncertainty. This is a qualitative illustration of the same
+weak-but-real r=0.257 relationship measured quantitatively above -- visible
+by eye, not just in the aggregate statistic.
+
+**Known display bug in this same figure, not a data/metric problem**: the
+GT LiDAR and Pred Mean rows render as solid, uniform blue blocks with no
+visible texture. This is the identical plotting issue already diagnosed
+and fixed for notebook 08's reconstruction grid: both rows plot absolute
+elevation (roughly -6 to -7m for this region) on a colormap centered at
+zero, so the values saturate to a single color. It does not affect any
+saved metric (RMSE, ZNCC, the calibration correlation, etc.) or the
+Uncertainty/Error rows, which are already display-correct -- it only makes
+the GT/Pred rows unreadable. Fix, not yet applied to notebook 11: recenter
+each patch around its own masked mean before plotting, the same fix used
+for notebook 08.
+
 **Why this isn't a failure, and how to frame it in the write-up**:
 ensemble sampling variance from a diffusion model's stochastic sampler
 captures *generative/output* uncertainty (variability in what the sampler
