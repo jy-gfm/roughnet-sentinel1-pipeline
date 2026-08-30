@@ -144,6 +144,21 @@ relationship along with the speckle, rather than cleanly separating
 specific dataset, how much of the fine-scale VV/VH texture is speckle
 versus genuine sub-patch roughness variation?
 
+**Result, added 2026-08-30**: I ran this ablation. Despeckling made things
+*worse*, not just unhelpfully neutral — ZNCC dropped from 0.166 (baseline)
+to 0.14, and RMSE got worse too (0.190 -> 0.21, the worst RMSE across all
+my Phase 1 ablations). The one metric that improved was PSD RMSE
+(2.099 -> 1.61). My reading is that this is evidence for the risk in
+Question 2 above: the filter likely smoothed away genuine fine-scale
+roughness texture along with speckle, hurting both spatial pattern
+fidelity (ZNCC) and magnitude accuracy (RMSE), while the aggregate
+frequency-spectrum metric improved simply because smoothing removes
+high-frequency content indiscriminately. Keeping Question 1 open since I
+only tested one crude filter — I'd still like your view on whether a
+proper adaptive despeckling method (Lee/Frost/Refined Lee) might behave
+differently, or whether this result is answer enough not to pursue it
+further given the time left.
+
 ## Terminology reference
 
 **Sigma-nought (σ⁰)**: the standard physical unit for radar backscatter —

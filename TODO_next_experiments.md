@@ -41,7 +41,7 @@ resolution-limit artifact.** This rules toward experiments 1.1-1.3 below
 rather than "S1 is just coarser so of course it looks worse." Saved to
 `/cs/student/project_msc/2025/aibh/jiayiche/s1_training_outputs/s1_coarse_vs_fine_comparison.json`.
 
-### 1.1. Native 2-channel architecture (no channel repetition) -- IN PROGRESS
+### 1.1. Native 2-channel architecture (no channel repetition) -- DONE (2026-08-29)
 
 Tests whether feeding `[VV, VH, VV, VH]` (out-of-distribution for filters
 trained on real 4-channel R/G/B/NIR) is itself degrading performance,
@@ -55,11 +55,11 @@ does not control the raw per-view channel count -- see the notebook's
 intro cell for the full explanation and diff). This patch is a
 prerequisite for Phase 2 as well (see below).
 
-Checkpoint: `s1_tuk_native2ch_unet_best.pth`. Compare its
-`s1_native2ch_validation_metrics.json` against notebook 04's baseline
-`s1_validation_metrics.json`, focusing on `zncc`/`jsd`.
+**Result**: ZNCC 0.166 -> 0.192, JSD 0.139 -> 0.099, RMSE 0.190 -> 0.197.
+Helps on its own. Checkpoint: `s1_tuk_native2ch_unet_best.pth`. Full table
+in `CONCEPTS.md`'s "Phase 1 final results summary" section.
 
-### 1.2. Real attributes instead of zero-filled (cheap, data already exists)
+### 1.2. Real attributes instead of zero-filled (cheap, data already exists) -- DONE (2026-08-29)
 
 Replace the zero-filled `attrs` tensor with real per-view metadata already
 sitting in `s1_patches_tuk_michel_provided`'s `attrs.json`
@@ -101,7 +101,12 @@ attrs = build_real_attrs(s1_path, times, self.context_k)
 Retrain with checkpoint name `s1_{REGION}_realattrs_unet_best.pth`, compare
 ZNCC/JSD against the zero-attrs baseline.
 
-### 1.3. Despeckle before feeding the model
+**Result**: ZNCC 0.166 -> 0.165, JSD 0.139 -> 0.129, RMSE 0.190 -> 0.195.
+Flat/no effect on its own against the repeated-channel baseline -- but see
+1.5 below, where combined with native2ch it does help. Checkpoint:
+`s1_tuk_realattrs_unet_best.pth`.
+
+### 1.3. Despeckle before feeding the model -- DONE (2026-08-30)
 
 Tests whether SAR's inherent multiplicative speckle noise (absent in
 optical reflectance) is obscuring a genuine roughness-backscatter
@@ -118,6 +123,31 @@ sar = 10.0 * np.log10(sar)
 ```
 New checkpoint filename: `s1_{REGION}_despeckled_unet_best.pth`.
 
+**Result**: ZNCC 0.166 -> **0.14** (worse than baseline), RMSE 0.190 ->
+**0.21** (worse than baseline, the worst RMSE of all Phase 1 runs). PSD
+RMSE did improve (2.099 -> 1.61) but the two headline metrics both got
+worse. This is a genuine negative result, not a null one -- see
+`CONCEPTS.md` for the interpretation (the filter likely removes real
+fine-scale roughness texture along with speckle, which also answers
+Question 8's second sub-question in `QUESTIONS_FOR_MICHEL.md`, now with
+measured evidence). Checkpoint: `s1_tuk_despeckled_unet_best.pth`.
+
+### 1.5. Combined: native2ch + real attrs -- DONE (2026-08-30)
+
+Added mid-sprint to test whether 1.1 and 1.2 interact (native2ch alone
+helps, realattrs alone doesn't -- does stacking them help more than
+native2ch alone, confirming an interaction, or land near native2ch alone,
+meaning realattrs contributes nothing regardless of channel handling?).
+Implemented in `notebooks/12_sentinel1_native2ch_realattrs_combined.ipynb`.
+
+**Result**: ZNCC 0.192 (native2ch alone) -> **0.204** (combined) -- best
+ZNCC, JSD (0.094, inside Tessa's S2 range), and PSD RMSE (1.576) of all
+five Phase 1 runs, with RMSE/normal-angle-error unchanged from native2ch
+alone. **Interaction confirmed**: real attrs only help once the channel
+input itself isn't corrupted by repetition, since both flow through
+`AttrAwareSpatialPool`'s joint `Z = cat([Fv, Amap])` computation.
+Checkpoint: `s1_tuk_native2ch_realattrs_unet_best.pth`.
+
 ### 1.4. Backscatter vs. reflectance as a signal type -- not directly testable
 
 Can't ablate this one (it's a sensor property, not a pipeline choice).
@@ -132,18 +162,22 @@ Optional follow-up: re-run `compute_collocation_quality_stats` on
 `s1_patches_tuk_michel_provided` specifically (currently only run on the
 own-patches dataset) to confirm the correlation holds there too.
 
-### Phase 1 suggested order
+### Phase 1 outcome and decision (2026-08-30) -- ALL DONE
 
-Cheapest/most informative first: **(1.1) native channels -> (1.2) real
-attrs -> (1.3) despeckling**. Each is a small code change plus one retrain;
-comparing their individual effect on ZNCC (rather than combining all three
-at once) tells you which factor actually matters most.
+All five ablations (1.1, 1.2, 1.3, 1.5 combined, plus the 1.0 coarse-res
+control) are complete. Best result is 1.5 (native2ch+realattrs combined):
+ZNCC 0.204, vs. baseline 0.166 and Tessa's Sentinel-2 reference ~0.74-0.78.
 
-**Decision point after Phase 1:** if one or more of 1.1-1.3 closes most of
-the ZNCC gap, the bottleneck was interface-level, not architectural --
-stop here (or layer the winning changes together) rather than proceeding
-to Phase 2. If ZNCC stays low across all three, that's evidence for
-Phase 2: the architecture itself may not suit SAR's statistics.
+**None of 1.1-1.3, nor their best combination, closes the ZNCC gap.**
+Per the decision rule set before running these: this is evidence the
+bottleneck is not purely interface-level -- it points toward Phase 2 (new
+SAR-specific architecture layer) or the deferred Planetary Computer RTC
+data path (`CONCEPTS.md`) as the next candidate explanations, rather than
+further preprocessing tweaks on the existing architecture. Whether to
+pursue either now is a time/writing-tradeoff call, not a methodology one --
+see the top-level sprint plan (Phase 1 + Phase 3 in 2 days) before adding
+Phase 2 scope. Full metrics table and interpretation in `CONCEPTS.md`'s
+"Phase 1 final results summary" section.
 
 ---
 

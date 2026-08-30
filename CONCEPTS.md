@@ -745,6 +745,74 @@ the gap -- at that point the evidence would point at the architecture
 itself, not the preprocessing, as the bottleneck. See
 `TODO_next_experiments.md` for the full phase breakdown.
 
+## Phase 1 final results summary (2026-08-30)
+
+All four Phase 1 ablations (08 native2ch, 09 realattrs, 10 despeckled) plus
+the combined test (12 native2ch+realattrs) are complete, evaluated against
+the same 04 baseline and Tessa's Sentinel-2 reference range:
+
+| Experiment | RMSE (m) | Bias (m) | Sigma Err % | Normal Angle (°) | JSD | PSD RMSE | ZNCC |
+|---|---|---|---|---|---|---|---|
+| 04 baseline (zero-attrs, repeated ch) | 0.190 | -0.0069 | 32.7% | 1.80 | 0.139 | 2.099 | 0.166 |
+| 08 native2ch | 0.197 | -0.00004 | 24.74% | 2.05 | 0.099 | 1.688 | 0.192 |
+| 09 realattrs | 0.195 | -0.0075 | 29.21% | 1.91 | 0.129 | 1.774 | 0.165 |
+| 10 despeckled | 0.21 | -0.01 | 26.78% | 2.00 | 0.11 | 1.61 | **0.14** |
+| **12 native2ch+realattrs (combined)** | 0.198 | 0.001 | 24.08% | 2.12 | **0.094** | **1.576** | **0.204** |
+| Tessa's Sentinel-2 (sample range) | ~0.11-0.135 | ~-0.001 to -0.002 | ~3-20% | ~1.5-2.1 | ~0.013-0.096 | ~0.6-0.86 | ~0.74-0.78 |
+
+**Individual factor effects on ZNCC:**
+- **Native channels (1.1) help on their own**: 0.166 -> 0.192.
+- **Real attrs alone don't** (0.166 -> 0.165, flat) — consistent with the
+  earlier finding that `AttrAwareSpatialPool`'s attention mechanism has
+  little to weight *with* when the channel input is already the
+  out-of-distribution repeated `[VV,VH,VV,VH]` (attrs 09 was tested against
+  the repeated-channel baseline, not against native2ch).
+- **Despeckling alone actively hurts** (0.166 -> **0.14**, and RMSE gets
+  worse too: 0.190 -> 0.21, the worst RMSE of all five runs). This is a
+  genuine negative result, not a null one.
+
+**Interaction confirmed**: combining native2ch + realattrs (12) reaches
+ZNCC=0.204, beating native2ch alone (0.192) by more than realattrs' solo
+effect would predict if the two factors were simply additive/independent
+(realattrs alone moved ZNCC by ~0, yet adding it on top of native2ch moved
+ZNCC by +0.012 beyond native2ch alone). This answers the question raised
+mid-sprint ("why wouldn't one uninformative + one informative factor
+interact?") — they do interact, mechanistically because both flow through
+the same `AttrAwareSpatialPool` computation (`Z = cat([Fv, Amap])`):
+real per-view attrs only have a meaningful per-view feature map `Fv` to
+attend over once the channel input itself isn't already corrupted by
+repetition. 12 is also the best result on JSD and PSD RMSE of all five
+Phase 1 runs, and its JSD (0.094) is inside Tessa's Sentinel-2 range.
+
+**Despeckling's negative result, interpreted against Question 8
+(`QUESTIONS_FOR_MICHEL.md`)**: the median filter was hypothesized to
+either (a) remove noise and reveal a cleaner roughness signal, or (b) not
+matter, or (c) remove real signal along with the noise. The result rules
+out (a) — despeckling made ZNCC *and* RMSE worse than the un-despeckled
+baseline, not just fail to improve them. That's evidence for (c): a 5x5
+flat median filter likely smooths away genuine fine-scale backscatter
+texture that correlates with roughness, not just multiplicative speckle.
+The one metric that did improve, PSD RMSE (2.099 -> 1.61, second-best of
+all five), is consistent with this: smoothing removes high-frequency
+content indiscriminately, which can move an aggregate frequency-spectrum
+metric closer to target even while destroying the pixel-wise spatial
+pattern (ZNCC) that depends on that texture being in the right place, and
+the flattened predictions even hurt raw magnitude accuracy (RMSE, Sigma
+Err %). This is exactly the risk flagged in Question 8's second
+sub-question, now with measured evidence behind it rather than a
+hypothetical concern — worth raising with Michel as an answered (not just
+asked) question.
+
+**Decision, per the rule set in `TODO_next_experiments.md`'s Phase 1
+section**: none of the individual ablations (08, 09, 10) closes the ZNCC
+gap, and neither does the best combination found (12, ZNCC=0.204 vs.
+Tessa's ~0.74-0.78 — still roughly a 3.5-4x gap). Per the pre-committed
+decision rule, this is evidence that the bottleneck is not purely
+interface-level, and points toward Phase 2 (a genuinely new SAR-specific
+architecture layer) or the deferred Planetary Computer RTC path (below) as
+the next candidate explanations — contingent on time remaining after the
+2-day Phase 1 + Phase 3 sprint and the dissertation-writing deadline.
+
 ## Considered-but-deferred: Microsoft Planetary Computer RTC data (2026-08-30)
 
 Planetary Computer's `sentinel-1-rtc` collection provides **radiometric
