@@ -674,3 +674,47 @@ only intensity transform applied to Sentinel-1 anywhere in this pipeline.
 Worth flagging explicitly in a methodology write-up rather than leaving it
 implicit, since it's an asymmetry between how the two sensors are prepared,
 independent of any of the Phase 1 ablations.
+
+## Why despeckling (Phase 1.3) uses a median filter, specifically
+
+SAR imagery has **speckle**: a grainy, salt-and-pepper noise pattern from
+coherent-imaging interference between many sub-resolution scatterers within
+a pixel. Unlike optical sensor noise (roughly additive, Gaussian-ish),
+speckle is **multiplicative** and appears even over physically uniform
+terrain — it's an artifact of how radar imaging works, not a property of
+the ground. Tessa's architecture was tuned around Sentinel-2's optical
+noise characteristics, so it's an open question whether it can see past
+SAR's very different noise structure to find the genuine roughness signal
+underneath.
+
+**Hypothesis being tested:** the raw, pre-model correlation between
+Sentinel-1 backscatter and LiDAR roughness was already measured at
+r=0.618-0.689 (`compute_collocation_quality_stats`, notebook 06) —
+moderate-to-strong, computed independent of the deep model. If that
+correlation is real but speckle is drowning it out before the model can
+learn from it, removing speckle first should make the relationship easier
+to learn, and ZNCC should improve. If ZNCC doesn't move, that argues
+speckle isn't the dominant bottleneck.
+
+**Why a median filter specifically, not a SAR-specific adaptive filter**
+(Lee, Frost, Refined Lee — which use local statistics rather than a flat
+window): time and simplicity, given a 2-day sprint. A 5x5 spatial median
+filter is a one-line, well-understood way to test "does despeckling help
+at all" cheaply. If it shows a real effect, that justifies building a more
+sophisticated despeckling approach later (Phase 2.2 in
+`TODO_next_experiments.md`: a learned, non-local-means-style layer) rather
+than investing in it upfront on an unproven hypothesis.
+
+**Why it's applied before dB conversion, not after:** speckle is
+multiplicative in the original linear power (sigma-nought) domain — that's
+the physically correct place to filter it. Filtering after the log
+transform would mean filtering a nonlinearly-distorted version of the
+noise.
+
+**Open concern, not yet resolved (asked in `QUESTIONS_FOR_MICHEL.md`,
+item 8):** despeckling smooths texture, but texture is arguably part of
+the genuine roughness signal, not purely noise. A median filter doesn't
+cleanly distinguish "noise being removed" from "real fine-scale roughness
+variation being removed" — a null result from this experiment could mean
+either "speckle wasn't the bottleneck" or "the filter removed real signal
+along with the noise," and this ablation alone can't tell those apart.
