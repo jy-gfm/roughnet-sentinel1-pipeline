@@ -718,3 +718,29 @@ cleanly distinguish "noise being removed" from "real fine-scale roughness
 variation being removed" — a null result from this experiment could mean
 either "speckle wasn't the bottleneck" or "the filter removed real signal
 along with the noise," and this ablation alone can't tell those apart.
+
+## What Phase 1 (notebooks 08/09/10) actually is, in one paragraph
+
+All three notebooks use Tessa's **identical, unmodified architecture** --
+same `ConditionalUNet`, same U-Net depth/width, same diffusion scheduler
+and sampler, same training loop, same evaluation metric family. The
+*only* thing that differs across them is a single preprocessing change
+applied to the raw Sentinel-1 data before it reaches that unchanged model:
+08 changes channel handling (real 2-channel VV/VH instead of repeated
+`[VV,VH,VV,VH]`), 09 changes metadata (real acquisition-age/orbit attrs
+instead of zero-filled), 10 changes denoising (a median filter before dB
+conversion). Each is a single-variable change against the same baseline
+(notebook 04) -- same data, same split, same seed -- so any metric
+difference is attributable to that one specific preprocessing choice, not
+a confound from several things changing at once.
+
+This design answers one specific question: **is Sentinel-1's weaker
+performance (ZNCC 0.166 vs. Sentinel-2's ~0.74-0.78) caused by how the
+data is fed into the architecture, or by the architecture itself being
+unsuited to SAR?** Phase 1 tests the "how it's fed in" hypothesis first,
+since it's cheap and doesn't require touching the model. Phase 2 (a new
+SAR-specific layer, e.g. the polarization-ratio feature) only becomes
+necessary if none of Phase 1's preprocessing changes meaningfully close
+the gap -- at that point the evidence would point at the architecture
+itself, not the preprocessing, as the bottleneck. See
+`TODO_next_experiments.md` for the full phase breakdown.
