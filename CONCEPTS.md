@@ -1176,3 +1176,46 @@ should now be built on top of `06`'s config (PC-RTC + real attrs, repeated
 4-channel VV/VH) as the base, not `03`'s plain baseline -- `06` is the
 strongest known starting point regardless of this decision, since it beats
 `03` on every metric.
+
+## `pcrtc/07` confidence map on the `06` checkpoint (2026-08-31)
+
+`notebooks/pcrtc/07_uncertainty_confidence_map.ipynb`, pointed at `06`'s
+checkpoint (`s1_tuk_pcrtc_realattrs_unet_best.pth`) and its real-attrs
+dataset class, run to completion (`N_SAMPLES=5`, `N_CALIBRATION_PATCHES=40`).
+
+**Result**: pixel-level correlation between predicted std and `|error|` =
+**0.4079** -- moderate (conventionally: <0.3 weak, 0.3-0.5 moderate,
+0.5-0.7 strong), and a real improvement over the Phase 3 result on the
+best raw-SAFE checkpoint (0.2570, see above), roughly a 59% relative
+increase. Qualitatively, the uncertainty map's highest-magnitude regions
+concentrate on the most complex/highest-error patches (e.g. patch 12597's
+branching terrain shows both the widest uncertainty and the most error
+variation of the six example patches) rather than being scattered
+independent of where the model actually struggles.
+
+**Important distinction, worth keeping separate**: this is a different
+number from the R²=0.880 GT-vs-pred-std scatter reported for `06` in the
+decomposition section above. That scatter compares per-patch *aggregate*
+standard deviation (does the model produce realistic overall variance per
+patch, computed from a single sampling pass) -- a variance-realism
+diagnostic. This section's r=0.4079 is the *actual* confidence-map
+calibration: per-pixel predicted uncertainty from a 5-sample ensemble,
+correlated against per-pixel real error. The two use the word "std" for
+different things and are not directly comparable -- don't cite one for
+the other in the write-up.
+
+**Display bug encountered and fixed**: the first run's visualization cell
+plotted GT and Pred Mean as absolute elevation values (patch mean already
+added back) on a colormap centered at zero, saturating both to solid
+color -- the same class of bug documented earlier in this project (see
+"Picture vs numbers" section). Fixed by recentering both by their own
+masked mean before display only, matching the convention already used in
+`03`/`06`'s reconstruction-grid cells; the saved calibration correlation
+number was computed from the raw (non-recentered) values throughout and
+was unaffected by the display bug.
+
+**Standing caveat, restated**: this measures the model's own
+generative/output uncertainty (sample-to-sample disagreement across
+independent noise seeds), not full epistemic uncertainty. A low-std
+(confident) prediction can still be systematically wrong if the model is
+consistently biased in a region rather than randomly uncertain there.
