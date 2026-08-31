@@ -44,19 +44,6 @@ for the full decomposition (including why the combined native2ch+realattrs
 config initially looked like a regression before isolating the two
 factors).
 
-## Where to go for more detail
-
-- **`CONCEPTS.md`** -- full methodology, every experiment's results,
-  literature comparisons, and reasoning behind each decision. The primary
-  running record of this project.
-- **`TODO_next_experiments.md`** -- experiment roadmap and status (what's
-  done, what's next, decision rules for when to move between phases).
-- **`QUESTIONS_FOR_MICHEL.md`** -- open questions for the supervision team,
-  with results appended as they land.
-- **`PHASE2_ARCHITECTURE_CANDIDATES.md`** -- ranked candidates for a
-  potential new architecture layer (DEM conditioning, distribution-matching
-  loss, and others), with a time-boxed recommendation.
-
 ## Setup
 
 See `requirements.txt` for dependencies and `.env.example` for required
