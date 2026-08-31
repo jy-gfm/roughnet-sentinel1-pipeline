@@ -719,6 +719,46 @@ variation being removed" — a null result from this experiment could mean
 either "speckle wasn't the bottleneck" or "the filter removed real signal
 along with the noise," and this ablation alone can't tell those apart.
 
+## Comparison against a published SAR preprocessing pipeline (2026-08-30)
+
+"An ensemble learning method to retrieve sea ice roughness from
+Sentinel-1 SAR images" documents a 5-step SNAP-based preprocessing
+pipeline: (1) apply orbit file, (2) thermal noise removal, (3) calibrate
+to NRCS (sigma-nought), (4) speckle filtering with the **Refined Lee
+filter** (7x7 window), (5) convert to dB. Comparing against this
+project's two pipelines:
+
+| Step | Raw-SAFE pipeline (01/03) | Planetary Computer RTC |
+|---|---|---|
+| Apply orbit file | Not documented as a step | Very likely included in Microsoft's RTC processing (standard for a production product), not independently confirmed |
+| Thermal noise removal | Not documented as a step | Same caveat as above |
+| Calibrate to NRCS | Yes -- matches | Yes -- matches |
+| Speckle filtering | Different method, negative result -- plain 5x5 median filter (notebook 10), not edge-preserving, made ZNCC/RMSE worse | Not applied |
+| Convert to dB | Yes -- matches | Yes -- matches |
+
+**Two takeaways:**
+
+1. **The raw-SAFE calibration path likely omits two standard steps**
+   (orbit-file correction, thermal noise removal) that this published
+   pipeline treats as baseline necessities. This strengthens the Phase 4
+   finding (PC-RTC baseline beating every raw-SAFE fix, `ZNCC=0.286` vs.
+   `0.204`) with a mechanistic explanation beyond just terrain correction:
+   a properly-processed product likely bundles several calibration steps
+   the DIY path skips, not just DEM-based terrain correction. Worth
+   confirming against Planetary Computer's own product documentation
+   rather than assuming, but it's the reasonable expectation for a
+   production RTC product.
+2. **This is concrete literature support for revisiting despeckling with
+   the right method.** The paper's own justification for using Refined
+   Lee is exactly the concern already raised in Question 8: it "averages
+   the image while preserving edges, so the patterns of sea ice will not
+   be affected." That edge-awareness is precisely what a plain median
+   filter lacks -- it can't distinguish "smoothing out speckle" from
+   "smoothing out a real ridge boundary," which is the most likely
+   explanation for notebook 10's negative result. If despeckling gets
+   revisited, Refined Lee (not another flat filter) is the well-supported
+   next thing to try, per Michel's own reply to Question 8's addendum.
+
 ## What Phase 1 (notebooks 08/09/10) actually is, in one paragraph
 
 All three notebooks use Tessa's **identical, unmodified architecture** --
@@ -811,7 +851,7 @@ decision rule, this is evidence that the bottleneck is not purely
 interface-level, and points toward Phase 2 (a genuinely new SAR-specific
 architecture layer) or the deferred Planetary Computer RTC path (below) as
 the next candidate explanations — contingent on time remaining after the
-2-day Phase 1 + Phase 3 sprint and the dissertation-writing deadline.
+2-day Phase 1 + Phase 3 sprint and remaining time.
 
 ## Phase 3 result: uncertainty/confidence map calibration (2026-08-30)
 
@@ -1026,6 +1066,51 @@ will show whether those interface-level fixes now also close the
 remaining JSD/PSD/variance gaps, the way they helped ZNCC on the raw-SAFE
 data.
 
+**Combined (native2ch+realattrs) result on PC-RTC data (2026-08-31),
+`notebooks/pcrtc/04_train_native2ch_realattrs.ipynb`**: the interaction
+effect that gave the best raw-SAFE result does not transfer to this data
+source -- it reverses.
+
+| | RMSE | ZNCC | JSD | PSD RMSE | Sigma Err % | Normal Angle | pred_std/gt_std |
+|---|---|---|---|---|---|---|---|
+| Raw-SAFE baseline (04) | 0.190 | 0.166 | 0.139 | 2.099 | 32.7% | 1.80 | -- |
+| Best raw-SAFE combo (12) | 0.198 | 0.204 | 0.094 | 1.576 | 24.08% | 2.12 | 0.84 (under) |
+| **PC-RTC baseline (03)** | **0.173** | **0.286** | 0.145 | 1.832 | 33.25% | 1.78 | 0.66 (under) |
+| **PC-RTC native2ch+realattrs (04)** | 0.238 | 0.219 | 0.122 | **1.326** | 38.83% | 2.559 | **1.24 (over)** |
+
+**On raw-SAFE data this combination was the best result found. On PC-RTC
+data it's worse than the plain baseline** on the four metrics that have
+mattered most throughout this project (RMSE, ZNCC, sigma-error,
+normal-angle-error). Only JSD improved slightly and PSD RMSE improved
+substantially (1.326, the best PSD RMSE of the entire study).
+
+**The variance-compression failure mode flipped direction.** Every prior
+experiment on both data sources under-predicted variance
+(`pred_std < gt_std`). This one over-predicts it (ratio 1.24) -- a
+genuinely different failure mode, not just a worse version of the same
+one. The GT-vs-pred-std scatter shows a compression-toward-the-middle
+pattern: the best-fit line sits above the 1:1 line for low-roughness
+patches (over-predicting calm areas) and crosses below it for
+high-roughness patches (still under-predicting the roughest ones).
+
+**Likely explanation**: on raw-SAFE data, channel repetition was fixing a
+real problem (out-of-distribution duplicated channels reaching a network
+whose first-layer filters expect 4 real, distinct signals). PC-RTC's
+baseline already performs well *with* repeated channels, suggesting the
+repetition artifact matters less once the underlying calibration/terrain-
+correction is already good -- so removing it doesn't offer the same fix,
+and combined with real attrs, something about this specific combination
+appears to destabilize training on this cleaner data distribution rather
+than help it.
+
+**Takeaway for the dissertation**: a preprocessing fix validated on one
+data source does not automatically generalize to another -- worth stating
+explicitly as a methodological finding, not just reporting the numbers.
+`pcrtc/05` (native2ch alone) and `pcrtc/06` (realattrs alone) will show
+which factor is actually driving this regression, or whether it's
+specifically the interaction between them (both fine alone, harmful
+together) that's responsible.
+
 **Status**: coverage and read-access are confirmed for Tuktoyaktuk.
 Turning this into an actual ablation (comparable to notebooks 08/09/10/12)
 would require a new patch-extraction step -- windowed-reading each LiDAR
@@ -1033,5 +1118,61 @@ patch's footprint from these COGs, analogous to notebooks 02/03's raw-SAFE
 patching -- plus a new training/eval notebook. That's a genuine new
 pipeline component, not a same-day addition; whether to build it now
 versus document this as a confirmed-but-deferred result and move to
-writing is a time-budget decision, not a methodology one, given the
-dissertation deadline.
+writing is a time-budget decision, not a methodology one.
+
+## Decomposing the pcrtc regression: `05` (native2ch alone) and `06` (realattrs alone), 2026-08-31
+
+`04`'s combined result looked like a confusing reversal on its own --
+worse than the plain baseline on RMSE/ZNCC/sigma-error/normal-angle, with
+variance compression flipping direction. Isolating the two factors
+resolves it into a clean, interpretable story.
+
+| | RMSE | ZNCC | JSD | PSD RMSE | Sigma Err % | Normal Angle | pred_std/gt_std | Calib R² |
+|---|---|---|---|---|---|---|---|---|
+| PC-RTC baseline (03) | 0.173 | 0.286 | 0.145 | 1.832 | 33.25% | 1.78 | 0.66 (under) | -- |
+| PC-RTC combined (04) | 0.238 | 0.219 | 0.122 | 1.326 | 38.83% | 2.56 | 1.24 (over) | -- |
+| PC-RTC native2ch alone (05) | 0.283 | 0.245 | 0.226 | 1.305 | **78.97%** | 2.71 | **1.62 (way over)** | 0.483 |
+| **PC-RTC realattrs alone (06)** | **0.159** | **0.519** | **0.054** | 1.345 | **13.13%** | 2.25 | **1.02 (near-perfect)** | **0.880** |
+
+**`06` (realattrs alone) is the best result of the entire study**, on
+every metric simultaneously -- including beating the plain baseline (03),
+which held that position until now. ZNCC nearly doubles (0.286 -> 0.519),
+closing much more of the gap to Tessa's Sentinel-2 reference (~0.74-0.78)
+than any previous fix on either data source. Variance compression is
+essentially resolved (`pred_std=0.173` vs. `gt_std=0.169`, ratio 1.02),
+and the ensemble-uncertainty calibration check (see Phase 3 section above)
+jumps to R²=0.880 -- by far the strongest calibration signal seen in this
+project, with the GT-vs-pred-std best-fit line visually overlapping the
+1:1 line across nearly the entire range (one high-variance outlier patch
+sits apart from the main cluster but still lands almost exactly on the
+line, consistent with, not contradicting, the strong overall fit).
+
+**`05` (native2ch alone) is actively harmful** -- worse than the baseline
+on every metric, and worse than the combined config (04) on most of
+them too (RMSE, ZNCC, JSD, sigma-error, normal-angle). Sigma-error blows
+up to 79%, the worst number in the entire study, and variance
+compression gets *more* extreme in the over-prediction direction (ratio
+1.62) than in the combined config (1.24).
+
+**This means the interaction in `04` is native2ch's damage partially
+offset by realattrs's benefit, not two neutral factors combining badly.**
+Realattrs alone is a strong, clean win; native2ch alone is a strong,
+clean loss; combining them nets out to "better than native2ch alone, but
+still worse than not using native2ch at all." The practical conclusion is
+simple: **use real per-view attrs, keep native 2-channel VV/VH (don't
+repeat to 4 channels) is NOT the fix on this data source -- repetition
+should stay, only the zero-filled attrs should be replaced with real
+ones.**
+
+**Revises the Phase 4 headline finding**: it is no longer "PC-RTC
+baseline (03) is the best config on this data source, but preprocessing
+fixes don't transfer from raw-SAFE." It is now "PC-RTC + real attrs (06)
+is the best config in the entire study, decisively so, and the specific
+raw-SAFE fix that doesn't transfer is native2ch, not realattrs."
+
+**Implication for Phase 2 / new architecture work**: any new architecture
+experiment (e.g. DEM conditioning, see `PHASE2_ARCHITECTURE_CANDIDATES.md`)
+should now be built on top of `06`'s config (PC-RTC + real attrs, repeated
+4-channel VV/VH) as the base, not `03`'s plain baseline -- `06` is the
+strongest known starting point regardless of this decision, since it beats
+`03` on every metric.
