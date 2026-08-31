@@ -851,7 +851,7 @@ decision rule, this is evidence that the bottleneck is not purely
 interface-level, and points toward Phase 2 (a genuinely new SAR-specific
 architecture layer) or the deferred Planetary Computer RTC path (below) as
 the next candidate explanations — contingent on time remaining after the
-2-day Phase 1 + Phase 3 sprint and the dissertation-writing deadline.
+2-day Phase 1 + Phase 3 sprint and remaining time.
 
 ## Phase 3 result: uncertainty/confidence map calibration (2026-08-30)
 
@@ -1118,8 +1118,7 @@ patch's footprint from these COGs, analogous to notebooks 02/03's raw-SAFE
 patching -- plus a new training/eval notebook. That's a genuine new
 pipeline component, not a same-day addition; whether to build it now
 versus document this as a confirmed-but-deferred result and move to
-writing is a time-budget decision, not a methodology one, given the
-dissertation deadline.
+writing is a time-budget decision, not a methodology one.
 
 ## Decomposing the pcrtc regression: `05` (native2ch alone) and `06` (realattrs alone), 2026-08-31
 
