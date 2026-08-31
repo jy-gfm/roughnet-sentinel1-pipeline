@@ -1066,6 +1066,51 @@ will show whether those interface-level fixes now also close the
 remaining JSD/PSD/variance gaps, the way they helped ZNCC on the raw-SAFE
 data.
 
+**Combined (native2ch+realattrs) result on PC-RTC data (2026-08-31),
+`notebooks/pcrtc/04_train_native2ch_realattrs.ipynb`**: the interaction
+effect that gave the best raw-SAFE result does not transfer to this data
+source -- it reverses.
+
+| | RMSE | ZNCC | JSD | PSD RMSE | Sigma Err % | Normal Angle | pred_std/gt_std |
+|---|---|---|---|---|---|---|---|
+| Raw-SAFE baseline (04) | 0.190 | 0.166 | 0.139 | 2.099 | 32.7% | 1.80 | -- |
+| Best raw-SAFE combo (12) | 0.198 | 0.204 | 0.094 | 1.576 | 24.08% | 2.12 | 0.84 (under) |
+| **PC-RTC baseline (03)** | **0.173** | **0.286** | 0.145 | 1.832 | 33.25% | 1.78 | 0.66 (under) |
+| **PC-RTC native2ch+realattrs (04)** | 0.238 | 0.219 | 0.122 | **1.326** | 38.83% | 2.559 | **1.24 (over)** |
+
+**On raw-SAFE data this combination was the best result found. On PC-RTC
+data it's worse than the plain baseline** on the four metrics that have
+mattered most throughout this project (RMSE, ZNCC, sigma-error,
+normal-angle-error). Only JSD improved slightly and PSD RMSE improved
+substantially (1.326, the best PSD RMSE of the entire study).
+
+**The variance-compression failure mode flipped direction.** Every prior
+experiment on both data sources under-predicted variance
+(`pred_std < gt_std`). This one over-predicts it (ratio 1.24) -- a
+genuinely different failure mode, not just a worse version of the same
+one. The GT-vs-pred-std scatter shows a compression-toward-the-middle
+pattern: the best-fit line sits above the 1:1 line for low-roughness
+patches (over-predicting calm areas) and crosses below it for
+high-roughness patches (still under-predicting the roughest ones).
+
+**Likely explanation**: on raw-SAFE data, channel repetition was fixing a
+real problem (out-of-distribution duplicated channels reaching a network
+whose first-layer filters expect 4 real, distinct signals). PC-RTC's
+baseline already performs well *with* repeated channels, suggesting the
+repetition artifact matters less once the underlying calibration/terrain-
+correction is already good -- so removing it doesn't offer the same fix,
+and combined with real attrs, something about this specific combination
+appears to destabilize training on this cleaner data distribution rather
+than help it.
+
+**Takeaway for the dissertation**: a preprocessing fix validated on one
+data source does not automatically generalize to another -- worth stating
+explicitly as a methodological finding, not just reporting the numbers.
+`pcrtc/05` (native2ch alone) and `pcrtc/06` (realattrs alone) will show
+which factor is actually driving this regression, or whether it's
+specifically the interaction between them (both fine alone, harmful
+together) that's responsible.
+
 **Status**: coverage and read-access are confirmed for Tuktoyaktuk.
 Turning this into an actual ablation (comparable to notebooks 08/09/10/12)
 would require a new patch-extraction step -- windowed-reading each LiDAR
