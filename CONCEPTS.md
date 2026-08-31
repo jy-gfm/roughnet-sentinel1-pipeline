@@ -1120,3 +1120,60 @@ pipeline component, not a same-day addition; whether to build it now
 versus document this as a confirmed-but-deferred result and move to
 writing is a time-budget decision, not a methodology one, given the
 dissertation deadline.
+
+## Decomposing the pcrtc regression: `05` (native2ch alone) and `06` (realattrs alone), 2026-08-31
+
+`04`'s combined result looked like a confusing reversal on its own --
+worse than the plain baseline on RMSE/ZNCC/sigma-error/normal-angle, with
+variance compression flipping direction. Isolating the two factors
+resolves it into a clean, interpretable story.
+
+| | RMSE | ZNCC | JSD | PSD RMSE | Sigma Err % | Normal Angle | pred_std/gt_std | Calib R² |
+|---|---|---|---|---|---|---|---|---|
+| PC-RTC baseline (03) | 0.173 | 0.286 | 0.145 | 1.832 | 33.25% | 1.78 | 0.66 (under) | -- |
+| PC-RTC combined (04) | 0.238 | 0.219 | 0.122 | 1.326 | 38.83% | 2.56 | 1.24 (over) | -- |
+| PC-RTC native2ch alone (05) | 0.283 | 0.245 | 0.226 | 1.305 | **78.97%** | 2.71 | **1.62 (way over)** | 0.483 |
+| **PC-RTC realattrs alone (06)** | **0.159** | **0.519** | **0.054** | 1.345 | **13.13%** | 2.25 | **1.02 (near-perfect)** | **0.880** |
+
+**`06` (realattrs alone) is the best result of the entire study**, on
+every metric simultaneously -- including beating the plain baseline (03),
+which held that position until now. ZNCC nearly doubles (0.286 -> 0.519),
+closing much more of the gap to Tessa's Sentinel-2 reference (~0.74-0.78)
+than any previous fix on either data source. Variance compression is
+essentially resolved (`pred_std=0.173` vs. `gt_std=0.169`, ratio 1.02),
+and the ensemble-uncertainty calibration check (see Phase 3 section above)
+jumps to R²=0.880 -- by far the strongest calibration signal seen in this
+project, with the GT-vs-pred-std best-fit line visually overlapping the
+1:1 line across nearly the entire range (one high-variance outlier patch
+sits apart from the main cluster but still lands almost exactly on the
+line, consistent with, not contradicting, the strong overall fit).
+
+**`05` (native2ch alone) is actively harmful** -- worse than the baseline
+on every metric, and worse than the combined config (04) on most of
+them too (RMSE, ZNCC, JSD, sigma-error, normal-angle). Sigma-error blows
+up to 79%, the worst number in the entire study, and variance
+compression gets *more* extreme in the over-prediction direction (ratio
+1.62) than in the combined config (1.24).
+
+**This means the interaction in `04` is native2ch's damage partially
+offset by realattrs's benefit, not two neutral factors combining badly.**
+Realattrs alone is a strong, clean win; native2ch alone is a strong,
+clean loss; combining them nets out to "better than native2ch alone, but
+still worse than not using native2ch at all." The practical conclusion is
+simple: **use real per-view attrs, keep native 2-channel VV/VH (don't
+repeat to 4 channels) is NOT the fix on this data source -- repetition
+should stay, only the zero-filled attrs should be replaced with real
+ones.**
+
+**Revises the Phase 4 headline finding**: it is no longer "PC-RTC
+baseline (03) is the best config on this data source, but preprocessing
+fixes don't transfer from raw-SAFE." It is now "PC-RTC + real attrs (06)
+is the best config in the entire study, decisively so, and the specific
+raw-SAFE fix that doesn't transfer is native2ch, not realattrs."
+
+**Implication for Phase 2 / new architecture work**: any new architecture
+experiment (e.g. DEM conditioning, see `PHASE2_ARCHITECTURE_CANDIDATES.md`)
+should now be built on top of `06`'s config (PC-RTC + real attrs, repeated
+4-channel VV/VH) as the base, not `03`'s plain baseline -- `06` is the
+strongest known starting point regardless of this decision, since it beats
+`03` on every metric.

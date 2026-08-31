@@ -121,6 +121,15 @@ comparison given the time left, or document this as confirmed-viable and
 treat it as future work in the write-up -- your read on which is the
 better use of remaining time would help.
 
+**Update, 2026-08-31**: built the full comparison after all. Result:
+**this is now the best config in the entire study.** PC-RTC data + real
+per-view attrs (repeated 4-channel VV/VH, no other changes) gives
+ZNCC=0.519, RMSE=0.159, and near-perfect variance calibration
+(pred_std/gt_std=1.02, up from 0.66 on the plain PC-RTC baseline) --
+closes most of the remaining gap to your Sentinel-2 ZNCC (~0.74-0.78,
+now roughly 1.4-1.5x rather than 2.6-2.7x). Full decomposition (isolating
+native2ch vs. real-attrs vs. their combination) is in `CONCEPTS.md`.
+
 ## 7. Scope — Tuktoyaktuk only, or extend to Pond Inlet / Cambridge Bay?
 
 Your diagnostic notebook found **zero** `IW_GRDH_1S` products for Pond
@@ -182,6 +191,21 @@ median filter lacks, and the most likely explanation for why it hurt
 rather than helped. If you think it's worth one more try given the time
 left, Refined Lee (not another flat filter) is the well-supported next
 step.
+
+## 9. Confidence map — does the ensemble-sampling approach match what Petru had in mind?
+
+I built the confidence/uncertainty map as: run the diffusion sampler N
+times per patch, take the per-pixel standard deviation across runs as the
+uncertainty map, and check calibration by correlating that std against
+actual prediction error. On the `pcrtc/06` checkpoint (the best model in
+the study), this calibrates very well -- R²=0.880 between per-patch
+predicted std and actual residual std, and the predicted-vs-ground-truth
+variance ratio is nearly 1:1 (0.173 vs. 0.169).
+
+**Question**: I'm not 100% sure this ensemble-sampling approach is
+actually what Petru meant when he suggested a confidence map -- could you
+check with him directly whether this matches his intent, or whether he
+had a different method/format in mind?
 
 ## Terminology reference
 

@@ -13,6 +13,10 @@ ranked menu in hand, not so any of these get built unilaterally.
 
 ## What's actually still broken (the target these candidates address)
 
+**Superseded by the `pcrtc/06` result below -- see the 2026-08-31 update
+section for the current picture.** Original framing, kept for the
+historical record of why these candidates were ranked this way:
+
 After Phase 1 (raw-SAFE preprocessing ablations) and Phase 4 (Planetary
 Computer RTC data source), two distinct problems remain unsolved:
 
@@ -130,3 +134,96 @@ plan already in `TODO_next_experiments.md`) rather than starting
 implementation unilaterally -- particularly because #1 (DEM conditioning)
 introduces a new external data dependency worth confirming is a sensible
 direction before investing acquisition + implementation time in it.
+
+## Update, 2026-08-31: `pcrtc/06` changes the picture substantially
+
+`notebooks/pcrtc/06_train_realattrs.ipynb` (PC-RTC + real per-view attrs,
+repeated 4-channel VV/VH, no native2ch) is now the best result in the
+entire study -- see `CONCEPTS.md`'s decomposition section for the full
+numbers. This directly changes both "still broken" problems above:
+
+1. **Problem #2 (variance compression) is essentially resolved by data
+   source + real attrs alone**, with no new architecture needed:
+   `pred_std/gt_std` = 1.02 (vs. 0.66 for the plain PC-RTC baseline), and
+   the ensemble-uncertainty calibration check jumps to R²=0.880. This
+   removes the strongest justification for candidate #2
+   (distribution-matching loss) -- there may be little left for it to fix.
+2. **Problem #1 (ZNCC gap) shrinks substantially but doesn't close**:
+   ZNCC=0.519 vs. Tessa's ~0.74-0.78, now roughly a 1.4-1.5x gap (down
+   from ~2.6-2.7x). Candidate #1 (DEM conditioning) is still the
+   best-targeted option for this remaining gap, but the size of the
+   problem it needs to solve is much smaller than when this ranking was
+   first written.
+
+**Revised recommendation**: if a new architecture experiment is still
+worth doing given the time left, build it on top of **`06`'s config**
+(PC-RTC + real attrs) as the base, not `03`'s plain baseline -- `06` is
+the strongest known starting point on any config tried, independent of
+this decision. **DEM conditioning (#1) remains the top candidate**, since
+the remaining problem it targets (ZNCC) is the one still open; candidate
+#2 (distribution-matching loss) is now lower priority than originally
+ranked, since the problem it was designed to fix looks largely solved
+already by `06`'s data-source/attrs combination.
+
+This also means the case for *not* pursuing a new architecture at all is
+stronger than before -- `06` alone may already be a strong enough
+headline result for the dissertation (best in the entire study, closes
+most of the S2 gap, near-perfect uncertainty calibration) that the
+marginal value of a new architecture layer is smaller than it looked when
+the gap was 2.6-2.7x. Worth putting this framing to Michel directly rather
+than assuming more experimentation is automatically better.
+
+## Time-boxed recommendation, added 2026-08-31
+
+Deadline runway changed the calculus, so recording both answers rather
+than one fixed ranking. Note: written before the `06` update above --
+the *choice* of candidate (DEM conditioning vs. distribution-matching
+loss) should now also weigh the `06` update's point that variance
+compression looks largely solved already, independent of days remaining.
+
+**At ~15 days remaining** (deadline read as 2026-09-15 from 2026-08-31):
+recommended **#2, distribution-matching loss** first. Reasoning: it's a
+pure training-loop change (new loss term alongside the existing masked
+MSE) with no new data-acquisition dependency, so it's the fastest path to
+a result under a tight timeline. It targets problem #2 (variance
+compression) directly. #1 (DEM conditioning) was judged too expensive to
+start safely at 15 days once its full cost is counted (coverage check +
+acquisition/collocation + new encoder branch + training + debugging
+buffer). *Revised in light of `06`: with variance compression now largely
+resolved by data source + real attrs alone, #2's justification is weaker
+than when this was written -- at 15 days, reporting `06` as the
+dissertation's headline result may be the better use of the remaining
+time than either architecture candidate.*
+
+**At ~22 days remaining** (user-stated timeline from 2026-08-31, i.e.
+target date around 2026-09-22 -- see note below on the deadline
+discrepancy): recommendation is **#1, DEM conditioning**, built on top of
+`06`'s config. Reasoning: the extra ~week is enough runway to absorb its
+higher setup cost, and it targets the remaining, now better-quantified
+gap (ZNCC 0.519 vs. Tessa's 0.74-0.78, ~1.4-1.5x). It's also the option
+that's a genuine new architecture layer, matching the original ambition
+("i really want to get something new, just as one layer tessa used"),
+rather than a loss-function tweak. Rough day budget proposed:
+
+- Days 1-2: DEM coverage check for Tuktoyaktuk (Copernicus GLO-30 or
+  ArcticDEM) + acquisition/collocation.
+- Days 3-5: implement the conditioning branch (small encoder, fused
+  similarly to how `AttrAwareSpatialPool` already fuses S1 views) --
+  code drafted, see chat log / notebook `dem/01-02`.
+- Days 6-9: training + debugging buffer (architecture changes on this
+  project have consistently hit at least one shape/loading bug). At
+  ~170min/full run (measured on `06`: 100min train + 70min eval), even
+  4-5 failed attempts costs under a day of GPU time -- compute isn't the
+  bottleneck, implementation/debugging is.
+- Days 10-11: evaluation, confidence map, comparison against `06`.
+- Remaining ~10 days: writing, with buffer to fall back to reporting `06`
+  as the dissertation's core finding if the DEM path underperforms or
+  runs long.
+
+**Deadline discrepancy, unresolved:** this project's prior confirmed
+deadline (2026-08-30, see `CONCEPTS.md`/memory) was **2026-09-15**, i.e.
+15 days from 2026-08-31, not 22. The user stated "22 days" on 2026-08-31
+without correcting this when the discrepancy was flagged back to them.
+Treating 22 days as the current operative number for this recommendation,
+but the actual date should be confirmed/reconciled before finalizing which
+recommendation (15-day vs. 22-day version above) actually applies.

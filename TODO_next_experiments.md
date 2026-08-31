@@ -56,6 +56,24 @@ since none depend on each other -- just not concurrently).
 See `CONCEPTS.md`'s Planetary Computer sections for full results as they
 land.
 
+### Phase 4 outcome and decision (2026-08-31) -- ALL DONE
+
+All four pcrtc configs are complete. Full metrics table and the
+resolved decomposition are in `CONCEPTS.md`. Headline result: **`06`
+(PC-RTC + real attrs, repeated 4-channel VV/VH, no native2ch) is the
+best result of the entire study** -- ZNCC=0.519 (vs. 0.286 for the plain
+PC-RTC baseline and 0.204 for the best raw-SAFE result), RMSE=0.159,
+near-perfect variance calibration (pred_std/gt_std=1.02, calibration
+R²=0.880). `05` (native2ch alone) is actively harmful (sigma-error blows
+up to 79%, worst of the study), which resolves `04`'s confusing combined
+result: native2ch's damage was being partially offset by realattrs's
+benefit, not two neutral factors interacting badly.
+
+**Decision: use `06`'s config as the base for any further work**,
+including Phase 2's new-architecture experiment -- it is now the
+strongest known starting point on any data source/config tried, not just
+the best PC-RTC config specifically.
+
 ---
 
 ## Phase 1: Interface-level ablations
@@ -219,20 +237,26 @@ Phase 2 scope. Full metrics table and interpretation in `CONCEPTS.md`'s
 
 ---
 
-## Phase 2 status (2026-08-30): paused pending supervisor input
+## Phase 2 status (2026-08-31): paused pending supervisor input
 
-Deadline confirmed as 2026-09-15 (not the earlier "10 days" estimate), so
-there's real room to attempt a new architecture layer if it's worth it --
-but the decision on *which* layer (a cheap polarization-ratio feature vs.
-a genuinely new learned module, e.g. a speckle-aware non-local block) is
-being deferred until after Phase 4 (Planetary Computer) finishes and
-Michel has weighed in. Plan: finish `pcrtc/03`/`pcrtc/04`, run the
-uncertainty/calibration check on the best resulting checkpoint, then email
-Michel with the combined results asking (1) to review results and suggest
-further preprocessing directions, (2) whether the confidence-map approach
-matches his intent, (3) whether a new architecture layer is worth training
-and what baseline he'd want it compared against. Sketches for both layer
-options are still below for reference once a direction is confirmed.
+Deadline is unconfirmed as of 2026-08-31 -- two conflicting numbers on
+record (2026-09-15 confirmed 2026-08-30, vs. "22 days" stated by the user
+on 2026-08-31, i.e. ~2026-09-22); needs reconciling before locking in
+scope. Phase 4 is now fully done (see outcome above) with a decisive
+winner (`pcrtc/06`). Ranked candidates for the new architecture layer are
+in `PHASE2_ARCHITECTURE_CANDIDATES.md`, including a time-boxed
+recommendation for both possible deadlines. Current plan: email Michel
+with the combined Phase 1+4 results asking (1) to review results and
+suggest further preprocessing directions, (2) whether the confidence-map
+approach matches his/Petru's intent -- **unconfirmed, needs Petru to
+verify directly** rather than assuming the ensemble-sampling approach
+already built is what was meant, (3) whether a new architecture layer
+(DEM conditioning is the top-ranked candidate) is worth training, and
+whether `pcrtc/06`'s config should be the base to build it on, given it's
+now the best result in the entire study. Sketches for the original two
+layer options are still below for reference; see
+`PHASE2_ARCHITECTURE_CANDIDATES.md` for the fuller, ranked menu including
+DEM conditioning and distribution-matching loss.
 
 ## Phase 2: New model -- SAR-specific layer(s) on top of Tessa's architecture
 
