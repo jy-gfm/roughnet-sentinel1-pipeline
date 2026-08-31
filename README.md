@@ -9,7 +9,7 @@ and a fundamentally different signal type.
 
 ## Two experiment tracks
 
-**Track A — raw-SAFE calibration** (`notebooks/01`-`12`): builds a custom
+**Track A — raw-SAFE calibration** (`notebooks/raw_data/01`-`12`): builds a custom
 Sentinel-1 calibration pipeline from raw SAFE archives (sigma-nought
 calibration, GCP-based georeferencing), then tests preprocessing fixes
 (native 2-channel input, real per-view attributes, despeckling, and their
