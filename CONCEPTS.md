@@ -1219,3 +1219,43 @@ generative/output uncertainty (sample-to-sample disagreement across
 independent noise seeds), not full epistemic uncertainty. A low-std
 (confident) prediction can still be systematically wrong if the model is
 consistently biased in a region rather than randomly uncertain there.
+
+## Verified: `lidar_patches_tuk_tessa` is genuinely Tuktoyaktuk, not Pond Inlet
+
+While tracing how Tessa's LiDAR patches and `region_id` assignment are
+generated (`Michel/RoughNet/notebooks/Copy of patching.ipynb`), found a
+discrepancy worth checking directly rather than assuming either way: the
+notebook's visible config cell points `lidar_path` at `tuk_2024.tif`, but
+a later visualization cell in the same notebook, showing a patch from the
+same `start_idx=12000, region_id+10` batch, titles it "LiDAR (Pond Inlet,
+06-04-24)". Since `input_data/lidar_patches_tuk_tessa/` -- the *only*
+directory ever used as `LIDAR_DIR` across every pcrtc training notebook
+(`03`-`06`, `09`, `10`) -- turned out to consist entirely of that same
+batch (patch IDs `12000`-`13675`, 1676 patches, exactly matching every
+run's "Paired: 1676" count, with no patch IDs below 12000 present at
+all), this meant every headline result in this project rested on data
+whose region identity had a real, unresolved contradiction in its
+provenance.
+
+**Verification performed**: reprojected a low-ID patch from the separate
+`lidar_patches_tuk` directory (patch `00014`, confirmed via its config
+cell to come from `tuk_2024.tif`, region_id 0-9 batch, EPSG:6931) and a
+patch from `lidar_patches_tuk_tessa` (patch `12066`, EPSG:32608) both to
+WGS84 lat/lon and compared directly.
+
+- `lidar_patches_tuk` (00014): 69.71°N, 133.34°W
+- `lidar_patches_tuk_tessa` (12066): 69.82°N, 133.35°W
+- Distance apart: **13.1 km**
+
+Both are squarely at Tuktoyaktuk (~69.45°N, 133.03°W) -- nowhere near
+Pond Inlet (~72.7°N, 77.9°W, ~2,000+ km away). The two patches are simply
+13 km apart, consistent with being two different sub-areas/extraction
+runs over the same local LiDAR survey.
+
+**Conclusion**: the "Pond Inlet" title was a stale copy-paste artifact in
+that one visualization cell, not a real label -- `lidar_patches_tuk_tessa`
+is genuinely Tuktoyaktuk data. No result in this project (`05`, `06`,
+`08`, `09`, `10`) needs reinterpretation because of this. Also means a
+future Cambridge Bay or Pond Inlet cross-region test starts from a clean
+baseline -- no prior contamination between "Tuktoyaktuk" training data and
+either candidate test region.
