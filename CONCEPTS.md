@@ -1342,3 +1342,95 @@ meaningless.
 artifact (this metric divides by `gt_std`, which is small here), not a
 literal "5x worse" claim -- RMSE and ZNCC are the honest way to state
 the magnitude of degradation. Don't quote 498% as a standalone headline.
+
+## In progress: full EW-mode model development (started, paused mid-way)
+
+Per Michel's fuller suggestion (not just testing the existing model on
+a new region, but training a *new* model on EW-mode data, in one region,
+then testing on another). Decided to pursue this despite the time cost,
+given it directly answers Michel's actual ask rather than the
+simplification (cross-region inference on the existing IW model) done
+above.
+
+**Region choice**: train on Tuktoyaktuk first (cleanest, most-validated
+existing pipeline pattern), test on Pond Inlet and/or Cambridge Bay
+afterward, per Michel's "train in one, test in the other" framing.
+
+**Key finding that justified the extra effort**: EW mode has
+dramatically better temporal coverage of these Arctic sites than IW.
+Direct queries (not the earlier unreliable web-fetch summary, which
+under-reported EW coverage and was not trusted) confirmed:
+- Tuktoyaktuk: nearest EW scene to the survey date (`2024-04-16`) is
+  **0.7 days away**. 1007 total EW scenes for this AOI since 2015, dense
+  coverage, no multi-year gaps like Cambridge Bay's IW/PC-RTC problem.
+- Pond Inlet: nearest EW scene to its survey date (`2024-04-26`) is
+  **0.5 days away**. 5057 total EW scenes since 2014 -- even denser than
+  Tuktoyaktuk.
+
+This makes sense in hindsight: EW mode is specifically tasked for
+polar/sea-ice monitoring, so these exact high-Arctic locations get
+prioritized far more consistently than under IW mode's general-purpose
+tasking.
+
+**Complications found and resolved**:
+1. `sentinel-1-rtc` (the pre-corrected collection used for all pcrtc
+   work) is confirmed **IW-only** -- zero EW scenes, checked directly.
+   EW is only available via the plain `sentinel-1-grd` collection.
+2. `sentinel-1-grd` EW assets are **raw uint16 digital numbers**, not
+   calibrated -- confirmed by inspecting one item directly (`hh` asset:
+   dtype uint16, sample values 0-1138). Needs radiometric calibration
+   (`sigma0 = DN^2 / calibration_LUT^2`) before use.
+3. These raw assets also have **no simple CRS/transform** (`rasterio`
+   reports `crs=None`) -- geolocation is via embedded GCPs, same
+   situation as the project's raw-SAFE track, not the simple
+   bounds-based windowing used for PC-RTC.
+4. Both (2) and (3) meant the existing `02`/`11`/`12`-style extraction
+   code couldn't be reused directly -- instead reused and adapted the
+   calibration + GCP-warping logic already built and proven in
+   `raw_data/03_sentinel1_preprocessing.ipynb` (`calibration_lut`,
+   `warp_grid`, `calibrate_and_warp`), swapping local SAFE file reads
+   for remote Planetary Computer asset URLs (`rasterio` handles the COG
+   read directly; the calibration XML needs a plain HTTP GET since it's
+   not a raster format).
+5. **Resolution trade-off, unavoidable and worth stating plainly**:
+   EW's native pixel spacing is 40m (vs IW's 10m), so a 256m LiDAR patch
+   spans only ~6x6 real pixels (`round(256/40)=6`) versus IW's 26x26.
+   The model's existing bilinear upsample to 256x256 will still run, but
+   is stretching far less real spatial detail than IW conditioning ever
+   had -- independent of whether the calibration/matching pipeline
+   itself is correct, this may be a genuine ceiling on how well an
+   EW-conditioned model can perform.
+
+**Built**: `notebooks/ew/01_tuk_ew_patch_extraction.ipynb` -- new `ew/`
+notebook folder (matching the existing `raw_data/`/`pcrtc/`
+per-source-track convention). Selects the 3 nearest EW scenes,
+calibrates + GCP-warps HH/HV via the adapted Track B functions, matches
+against Tuktoyaktuk's existing 1676 LiDAR patches. Includes a one-band
+sanity-check cell (calibrate + warp just `t0`'s HH band, check the
+finite-pixel fraction and confirm calibrated sigma0 values fall in a
+physically plausible linear range, roughly 0.0001-1.0) before committing
+to the full 3-scene x 2-band batch.
+
+**Update: sanity check run, found and fixed a real bug.** First run
+computed a destination grid of 12166x11679 px (~487km x 467km) for an
+AOI that's only ~3km x 17km -- `calculate_default_transform` was sizing
+the output to the *entire* EW scene's full width/height (the whole
+~400km swath), not the small AOI, wasting ~142M pixels of compute/disk
+per band. The calibration math itself was already correct, confirmed by
+that same run's values: mean sigma0 0.0607 linear (~-12.2dB), physically
+plausible for real Arctic terrain. Fixed with
+`compute_dst_grid_from_aoi`, which builds the destination
+transform/width/height directly from the known AOI bounds (small pixel
+buffer) instead of deriving it from the source scene -- computed once,
+reused for every scene/band since it no longer depends on any per-scene
+property.
+
+**Status: fix pushed, not yet re-run.** Next action when resuming: run
+the sanity check again with the corrected grid sizing, confirm the
+output dimensions now look reasonable (a few hundred pixels, not tens
+of thousands) and the finite fraction/value range still look sane, then
+proceed to the full extraction + verification cells, then build the
+training notebook (mirrors `pcrtc/09`'s architecture and spatial-block
+split, pointed at `s1_patches_tuk_ew`, `cond_channels=4*CONTEXT_K`
+unchanged since HH/HV
+repeats to 4 channels the same way VV/VH did).
