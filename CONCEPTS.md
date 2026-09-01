@@ -1425,12 +1425,37 @@ buffer) instead of deriving it from the source scene -- computed once,
 reused for every scene/band since it no longer depends on any per-scene
 property.
 
-**Status: fix pushed, not yet re-run.** Next action when resuming: run
-the sanity check again with the corrected grid sizing, confirm the
-output dimensions now look reasonable (a few hundred pixels, not tens
-of thousands) and the finite fraction/value range still look sane, then
-proceed to the full extraction + verification cells, then build the
-training notebook (mirrors `pcrtc/09`'s architecture and spatial-block
-split, pointed at `s1_patches_tuk_ew`, `cond_channels=4*CONTEXT_K`
-unchanged since HH/HV
-repeats to 4 channels the same way VV/VH did).
+**Fix confirmed working.** Re-ran the sanity check with the corrected
+grid sizing:
+
+- Destination grid: **115 x 450 px @ 40m (4.60km x 18.00km)** -- matches
+  the actual buffered AOI, not the ~487km x 467km of the original buggy
+  run.
+- Shape: (450, 115), **finite fraction: 1.0** -- the whole (correctly
+  small) AOI is covered by this scene, no missing data.
+- Valid-pixel range: 0.00224-0.0611 linear (mean 0.0136) -- converts to
+  roughly **-26.5 to -12.2 dB, mean -18.7 dB**. Tight, physically
+  plausible range for real Arctic terrain, and notably free of the
+  earlier run's suspicious +8.97dB outlier (which was almost certainly
+  some unrelated feature far outside the actual AOI, swept in by the
+  oversized grid).
+
+**Also clarified, while investigating an unrelated question**: checked
+Michel's own `calibrate_and_warp_s1_band` (in his
+`patching_sentinel1.ipynb`) directly -- he also stores linear
+sigma-nought on disk, identical to this project's DIY calibration and
+the new EW pipeline. His code's dB conversion only happens inside a
+separate visualization helper (`show_multiple_matched_patches`,
+`use_db=True` by default) when displaying patches, not at the
+calibration/storage step -- no actual discrepancy between "sigma-naught
+vs dB" once you check where each conversion actually happens; both
+pipelines store the same linear quantity and convert to dB only for
+display/training-input purposes, just at different points.
+
+**Status: sanity check passed, ready for the full 3-scene x 2-band
+batch.** Next action when resuming: run the full extraction cell (all
+three EW scenes, HH+HV each), then the matching + verification cells,
+then build the training notebook (mirrors `pcrtc/09`'s architecture and
+spatial-block split, pointed at `s1_patches_tuk_ew`,
+`cond_channels=4*CONTEXT_K` unchanged since HH/HV repeats to 4 channels
+the same way VV/VH did).
