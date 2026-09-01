@@ -1411,10 +1411,26 @@ finite-pixel fraction and confirm calibrated sigma0 values fall in a
 physically plausible linear range, roughly 0.0001-1.0) before committing
 to the full 3-scene x 2-band batch.
 
-**Status: not yet run.** The notebook is built and pushed but the
-sanity-check cell hasn't been executed yet -- this is the next thing to
-do when resuming. If the sanity check looks right, proceed to the full
-extraction + verification cells, then build the training notebook
-(mirrors `pcrtc/09`'s architecture and spatial-block split, pointed at
-`s1_patches_tuk_ew`, `cond_channels=4*CONTEXT_K` unchanged since HH/HV
+**Update: sanity check run, found and fixed a real bug.** First run
+computed a destination grid of 12166x11679 px (~487km x 467km) for an
+AOI that's only ~3km x 17km -- `calculate_default_transform` was sizing
+the output to the *entire* EW scene's full width/height (the whole
+~400km swath), not the small AOI, wasting ~142M pixels of compute/disk
+per band. The calibration math itself was already correct, confirmed by
+that same run's values: mean sigma0 0.0607 linear (~-12.2dB), physically
+plausible for real Arctic terrain. Fixed with
+`compute_dst_grid_from_aoi`, which builds the destination
+transform/width/height directly from the known AOI bounds (small pixel
+buffer) instead of deriving it from the source scene -- computed once,
+reused for every scene/band since it no longer depends on any per-scene
+property.
+
+**Status: fix pushed, not yet re-run.** Next action when resuming: run
+the sanity check again with the corrected grid sizing, confirm the
+output dimensions now look reasonable (a few hundred pixels, not tens
+of thousands) and the finite fraction/value range still look sane, then
+proceed to the full extraction + verification cells, then build the
+training notebook (mirrors `pcrtc/09`'s architecture and spatial-block
+split, pointed at `s1_patches_tuk_ew`, `cond_channels=4*CONTEXT_K`
+unchanged since HH/HV
 repeats to 4 channels the same way VV/VH did).
