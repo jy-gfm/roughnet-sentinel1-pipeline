@@ -1259,3 +1259,86 @@ is genuinely Tuktoyaktuk data. No result in this project (`05`, `06`,
 future Cambridge Bay or Pond Inlet cross-region test starts from a clean
 baseline -- no prior contamination between "Tuktoyaktuk" training data and
 either candidate test region.
+
+## Cross-region generalization test: Tuktoyaktuk model on Cambridge Bay
+
+Per Michel's suggestion to test the existing model on a genuinely new
+region (`pcrtc/13_cambridge_bay_crossregion_inference.ipynb`). Ran `09`'s
+frozen, already-trained checkpoint (real-attrs, spatial-block split, the
+best leakage-free Tuktoyaktuk model) on 400 randomly-sampled Cambridge
+Bay patches -- no retraining, no train/val split, every patch held out.
+
+**Pond Inlet was ruled out first.** Its nearest available Sentinel-1
+imagery was either HH-only (405-429 days off, same season) or HH+HV
+(2.6-9 years off, inconsistent seasons) -- no VV+VH coverage at all for
+that AOI. Using it would have stacked three confounds at once (region +
+date + polarization mode). Cambridge Bay's nearest VV+VH scenes are
+~402-409 days after the survey (May 2025, cross-season) -- a single
+confound, chosen over Pond Inlet's three-way one.
+
+**Extraction required two fixes**, both in `11`, before matching worked
+at all:
+1. One of the three selected scenes (2025-05-25) was delivered in UTM
+   zone 12N while the other two and the LiDAR patches are in zone 13N --
+   Sentinel-1 scenes get assigned a zone based on the whole scene's
+   footprint, not this AOI. Windowing that scene against LiDAR bounds in
+   its native zone computed a distorted 28x28 window instead of 26x26,
+   failing every single patch's exact-size check (0/2112 matched).
+   Fixed by reprojecting every merged scene into the LiDAR patches' CRS
+   at a fixed 10m grid before matching.
+2. That reprojection then left 17.3% of the reprojected scene's pixels
+   at the initial-array value of exactly `0.0` (a border effect from
+   warping between UTM zones) -- real SAR backscatter never reads as
+   exactly zero, so this would have silently passed corrupted data
+   through undetected (the matcher only checked NaN fraction). Fixed by
+   filling unmapped pixels with NaN instead, letting the existing
+   NaN-fraction check catch them. Final result: 2101/2112 matched.
+
+Full DDIM inference on all 2101 patches would take ~10 hours (scaled
+from the ~70min/251-patch benchmark) for a negligibly tighter estimate
+than a smaller sample; subsampled to 400 (seed 42, ~7x Tuktoyaktuk's own
+251-patch validation set) instead, cutting the run to ~1.5-2 hours.
+
+### Results
+
+| metric | Tuktoyaktuk in-region (09) | Cambridge Bay cross-region |
+|---|---|---|
+| RMSE (m) | 0.1945 | 0.3389 |
+| bias (m) | -0.0013 | -0.0088 |
+| sigma_error (%) | 22.73 | 498.42 |
+| normal_angle_error (deg) | 1.989 | 2.463 |
+| JSD | 0.1180 | 0.5570 |
+| PSD RMSE | 1.3092 | 1.5686 |
+| ZNCC | 0.2344 | **0.0064** |
+| gt_std | 0.1721 | 0.0834 |
+| pred_std | 0.1384 | **0.3159** |
+| uncertainty calibration corr. | 0.4079 (from `07`) | 0.1526 |
+
+**Finding 1 -- spatial correlation collapses.** ZNCC drops to
+essentially zero (0.0064), a similar magnitude of collapse to `08`'s
+unseen-date Tuktoyaktuk test (0.52 to 0.01). Because Cambridge Bay's
+test data carries both a new-region confound *and* the same
+cross-season confound `08` isolated, this single test cannot cleanly
+attribute the collapse to region generalization alone -- both are
+stacked here.
+
+**Finding 2 -- a specific, characterizable failure mode, not just
+"worse."** `gt_std` (0.083) confirms Cambridge Bay's terrain really is
+much flatter than Tuktoyaktuk's (consistent with the direct visual
+check on the raw LiDAR patches earlier), but `pred_std` (0.316) is
+nearly 4x *larger* than the true variance. The model isn't going bland
+on unfamiliar input -- it's imposing Tuktoyaktuk-specific roughness
+texture onto genuinely smoother terrain. The GT-vs-pred std scatter
+plot shows this directly: predictions spread widely regardless of how
+flat the corresponding ground truth actually is. Worth stating in the
+write-up as the specific failure mode, not just a degraded metric.
+
+**Finding 3 -- confidence calibration degrades but doesn't collapse.**
+0.4079 to 0.1526: weaker, but still positive -- the model's own
+uncertainty estimate remains a weak-but-real signal cross-region, not
+meaningless.
+
+**Caveat on `sigma_error_pct`**: the 498% figure is a normalization
+artifact (this metric divides by `gt_std`, which is small here), not a
+literal "5x worse" claim -- RMSE and ZNCC are the honest way to state
+the magnitude of degradation. Don't quote 498% as a standalone headline.
