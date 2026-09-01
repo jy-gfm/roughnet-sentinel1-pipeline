@@ -1459,3 +1459,55 @@ then build the training notebook (mirrors `pcrtc/09`'s architecture and
 spatial-block split, pointed at `s1_patches_tuk_ew`,
 `cond_channels=4*CONTEXT_K` unchanged since HH/HV repeats to 4 channels
 the same way VV/VH did).
+
+## EW model trained; headline result and a genuine finding from the S2 visual check
+
+**`ew/02` training completed.** Same architecture, same spatial-block
+split as `09` (identical validation patches -- confirmed by matching
+`gt_std_val`), from-scratch weights, EW-mode conditioning:
+
+| metric | IW/PC-RTC (09) | EW (ew/02) |
+|---|---|---|
+| RMSE (m) | 0.1945 | 0.2505 |
+| ZNCC | 0.2344 | **-0.0066** |
+| sigma_error (%) | 22.73 | 35.90 |
+| PSD RMSE | 1.3092 | 1.7575 |
+| gt_std | 0.1721 | 0.1721 (identical val set) |
+| pred_std | 0.1384 | 0.1746 |
+
+ZNCC collapses to essentially zero -- the EW-trained model shows no
+meaningful spatial correlation with true roughness, despite
+near-perfect temporal alignment with the survey (no date confound here,
+unlike Cambridge Bay). The reconstruction grid shows this directly:
+predictions are a generic, low-detail blur, missing the branching
+ridge/channel network clearly visible in ground truth. Best-supported
+explanation: EW's native 6x6 pixels per patch (vs IW's 26x26) doesn't
+carry enough real spatial information for the model to learn this
+task's fine-grained structure -- a genuine, well-evidenced negative
+result, not an implementation bug (same architecture, same recipe, same
+val set, only the conditioning source differs).
+
+**S2 visual check (Michel's actual request) hit a real, informative
+finding of its own.** Every Sentinel-2 scene near the survey date
+(`2024-04-16`), across 10 candidates spanning March-May 2024 and cloud
+covers from 1.6% to 27.3%, showed **`valid_frac_over_AOI = 0.000`** --
+the entire windowed crop reading as uniform value 255. Verified this
+wasn't a coordinate/geometry bug by testing summer 2024 scenes (e.g.
+2024-08-05, 0% cloud) over the identical AOI: those returned
+`valid_frac_over_AOI = 1.000`, confirming the geometry and code were
+correct throughout. Conclusion: Tuktoyaktuk's ground is genuinely
+snow/ice-covered March-May, and Sentinel-2's 8-bit true-color "visual"
+composite saturates to pure white over that kind of high-albedo
+surface -- not a bug, a real physical characteristic of the site during
+the survey season.
+
+**Worth stating directly in the write-up**: this is concrete,
+first-hand evidence for why SAR is the right tool for this task in the
+first place -- optical Sentinel-2 imagery is essentially unusable
+during the snow-covered season at this site, while Sentinel-1 sees
+through cloud, darkness, and isn't affected by visual saturation over
+snow. The visual check itself now uses a **summer** S2 scene instead
+(`2024-08-05`) for a general "does the landform look consistent" check
+-- explicitly caveated in the write-up as showing summer ground cover,
+not survey-date conditions, since no usable optical imagery exists for
+the actual survey date at all.
