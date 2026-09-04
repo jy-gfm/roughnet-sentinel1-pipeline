@@ -1179,6 +1179,21 @@ strongest known starting point regardless of this decision, since it beats
 
 ## `pcrtc/07` confidence map on the `06` checkpoint (2026-08-31)
 
+**Correction (2026-09-04): the 0.4079 figure below was computed against
+the contaminated (leakage-fixed) `06` checkpoint, not the actual
+leakage-free `09` model this project reports against everywhere else.**
+`pcrtc/07` was written before `pcrtc/08` found `06`'s spatial leakage and
+`pcrtc/09` retrained on the corrected split, and was never updated
+afterward -- it still pointed at `06`'s checkpoint and reconstructed `06`'s
+naive shuffle split (not `09`'s spatial-block split). Fixed in
+`pcrtc/07` (repo commit `b87d60a`) to load `09`'s checkpoint and
+reconstruct its actual validation set. Re-run, the corrected in-region
+calibration correlation is **0.3165**, not 0.4079 -- see "Confidence-map
+calibration, corrected, and does uncertainty catch the terrain? below
+for the full corrected picture. Everything in the rest of this section is
+kept for the historical record but should not be cited as the project's
+in-region calibration number.
+
 `notebooks/pcrtc/07_uncertainty_confidence_map.ipynb`, pointed at `06`'s
 checkpoint (`s1_tuk_pcrtc_realattrs_unet_best.pth`) and its real-attrs
 dataset class, run to completion (`N_SAMPLES=5`, `N_CALIBRATION_PATCHES=40`).
@@ -1511,3 +1526,100 @@ snow. The visual check itself now uses a **summer** S2 scene instead
 -- explicitly caveated in the write-up as showing summer ground cover,
 not survey-date conditions, since no usable optical imagery exists for
 the actual survey date at all.
+
+## Confidence-map calibration, corrected, and does uncertainty catch the terrain? (2026-09-04)
+
+**The leakage-fix bug in `pcrtc/07`.** `pcrtc/07_uncertainty_confidence_map.ipynb`
+was authored before `pcrtc/08` discovered `06`'s 100% spatial leakage and
+`pcrtc/09` retrained on the corrected spatial-block split. `07` was never
+updated afterward: `CHECKPOINT_NAME` still pointed at `06`'s checkpoint
+(`s1_tuk_pcrtc_realattrs_unet_best.pth`) and the split-reconstruction cell
+still used `06`'s naive `random.shuffle()` logic instead of `09`'s
+spatial-block method. Every number `07` produced (including the 0.4079
+figure documented in the section above, and the same figure sent to
+Michel/Petru before this was caught) was therefore computed against the
+leaky checkpoint on a contaminated validation split. Found while checking
+whether an email draft's confidence-map claim was defensible; fixed in
+repo commit `b87d60a` by pointing `CHECKPOINT_NAME` at `09`'s checkpoint
+(`s1_tuk_pcrtc_realattrs_spatialsplit_unet_best.pth`) and replacing the
+split cell with `09`'s exact spatial-block split plus its zero-overlap
+assertion, so the notebook can only evaluate `09`'s real held-out set.
+
+**Corrected calibration numbers** (predicted std vs. `|error|`, pixel-level,
+pooled over 40 calibration patches, `N_SAMPLES=5`):
+
+| Setting | Calibration correlation | Notebook |
+|---|---|---|
+| In-region (Tuktoyaktuk, `09` checkpoint) | **0.3165** (was wrongly reported as 0.4079) | `pcrtc/07`, fixed |
+| Cross-region (Cambridge Bay) | **0.1874** (previously reported as 0.1792, both against the correct checkpoint -- the small difference between these two runs is expected DDIM sampling variance from `cudnn.benchmark=True`, not a bug) | `pcrtc/13` |
+
+Direction makes sense: leakage inflates every metric in this study (RMSE,
+ZNCC, and evidently calibration correlation too), since a model partially
+memorizing its validation patches is both more accurate and more
+confidently-correctly-so than one genuinely generalizing. The
+0.41-to-0.32 in-region drop is consistent with the same underlying cause
+as the RMSE/ZNCC leakage corrections documented earlier in this file, not
+a new, separate problem.
+
+**Does the uncertainty map catch the terrain itself, not just the model's
+own error?** These are different questions -- calibration correlation
+(above) tests uncertainty vs. `|error|` (does high uncertainty mean the
+model is more often wrong); a separate check tests uncertainty vs. `|GT|`
+(centered, so magnitude means "rough" not "high elevation") -- does high
+uncertainty mean the *terrain itself* is rougher there, independent of
+whether the model got it right. Added to both `pcrtc/07` and `pcrtc/13`
+(reuses the same 40 calibration patches, no extra sampling cost). Result
+on Cambridge Bay:
+
+| Comparison | Correlation |
+|---|---|
+| Uncertainty vs. `\|error\|` (calibration) | 0.1874 |
+| Uncertainty vs. `\|GT\|` (terrain roughness) | **0.0096** |
+
+**0.0096 is indistinguishable from zero.** The uncertainty map does *not*
+catch the terrain's actual roughness pattern -- it only weakly tracks
+where the model's own prediction is likely to be wrong. This resolves a
+question that came up looking at the `pcrtc/06` in-region confidence-map
+figure, where the uncertainty (std) row visually seemed to echo some of
+the same rough/smooth structure as GT for a few patches: that visual
+impression does not survive a direct, quantitative test, at least
+cross-region. (The equivalent in-region `terrain_corr` check on `07` has
+not yet been run -- worth doing before generalizing this conclusion
+beyond Cambridge Bay.)
+
+**Candidate physical explanation for why SAR conditioning underperforms
+here at all, not just for the uncertainty result:** Sentinel-1 is C-band
+(wavelength ~5.6cm). By the standard Rayleigh/Fraunhofer roughness
+criteria (Ulaby, *Microwave Remote Sensing*), a surface is "smooth" to a
+radar when `h_rms < λ/(8·cos θ)` and "very rough" (backscatter saturated,
+losing discriminating power) when `h_rms > λ/(25·cos θ)`. At a typical
+Sentinel-1 IW incidence angle (θ≈35°), that rough-surface threshold is
+**~0.27cm** -- natural tundra/soil surfaces almost always have
+centimeter-scale height variation well above this, so C-band backscatter
+over this kind of terrain is very likely already saturated with respect
+to fine-scale roughness, well before you even get to the meter-scale
+topographic relief this project's LiDAR target actually measures. In
+other words: radar "roughness" (wavelength-scale surface texture, cm) and
+LiDAR "roughness" (topographic relief, meters) may simply be two
+different physical quantities that share a name, at least at this
+resolution and wavelength -- a plausible, literature-grounded explanation
+for the SAR-conditioning ceiling seen throughout this project (Phase 1
+ZNCC ~0.23 at best, EW ZNCC ~0, cross-region ZNCC ~0), independent of
+model architecture or training recipe. Caveat: this is a desk calculation
+from standard SAR theory, not a claim verified against direct cm-scale
+field roughness measurements at these specific sites -- present it as a
+plausibility argument in the discussion section, not a proven mechanism.
+
+**Proposed follow-up experiment (not yet run): multi-scale roughness vs.
+backscatter correlation.** A more direct empirical test of the
+scale-mismatch hypothesis than the Rayleigh-criterion argument alone:
+compute LiDAR-derived roughness (local elevation std) at several window
+sizes (e.g. 1m, 5m, 20m) instead of only the single patch-level scale the
+model targets, and correlate each against mean Sentinel-1 backscatter
+(dB) for the same patch. If backscatter correlates meaningfully better
+with fine-scale roughness than with the coarser scale the model actually
+predicts, that's direct empirical evidence for the scale-mismatch story,
+not just a physics argument from the literature. Self-contained analysis,
+reuses existing LiDAR and Sentinel-1 patch data already on disk -- no new
+acquisition or training needed. Not yet implemented; a candidate next
+step if time remains after the write-up.
