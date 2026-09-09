@@ -1674,3 +1674,74 @@ write-up rather than collapsing both into a generic "generalizes poorly."
 The reconstruction grid supports this qualitatively: predicted patches
 show visibly less contrast/texture than GT across all six example
 patches, consistent with the halved `pred_std`.
+
+## DEM conditioning (dem_unet/02): helps placement, hurts the spectrum (2026-09-09)
+
+**What was built.** `DEMConditionalUNet` subclasses Tessa's
+`ConditionalUNet` and adds a small static-DEM branch: a 2-layer conv
+encoder (1 -> 16 -> 16 channels, 2,480 params) whose 16 feature maps are
+concatenated to the U-Net input alongside the noisy target and the fused
+S1 conditioning, widening `input_conv.conv1` from 13 to 29 input
+channels. Total addition ~20.9K params on a ~104.6M model -- invisible at
+"104.6M" rounding, so parameter count is *not* a usable check that the
+branch is wired in; check `model.input_conv.conv1.in_channels == 29`
+instead. Because `p_sample_loop_ddim` calls `model(x, cond, attrs, t)`
+with a fixed 4-arg signature, the DEM is bound at eval time via a
+`DemBoundModel` adapter rather than passed through the sampler.
+
+DEM source is ArcticDEM 10m mosaics v4.1 (PGC STAC), demeaned per patch
+to match the LiDAR target convention. Copernicus GLO-30 was tried first
+and abandoned: it has a genuine void over Tuktoyaktuk (raw tile nonzero
+only in rows 1415-3599; the AOI sits at row ~770).
+
+**Split is bit-identical to `09`.** train=534, val=255, 887 dropped as
+buffer, 0/255 overlaps -- matches
+`s1_pcrtc_realattrs_spatialsplit_split_check.json` exactly. The DEM
+branch is therefore the only difference between the two runs.
+
+**Result (in-region validation, 255 paired patches).**
+
+| metric | `09` (no DEM) | + DEM | paired mean diff | 95% CI (bootstrap, 10k) | DEM higher |
+|---|---|---|---|---|---|
+| zncc | 0.2344 | 0.2866 | +0.0522 | [+0.0375, +0.0665] | 69% |
+| rmse_m | 0.1945 | 0.1894 | -0.0051 | [-0.0071, -0.0032] | 36% |
+| psd_rmse | 1.3092 | 1.6886 | +0.3794 | [+0.3503, +0.4093] | 96% |
+| jsd | 0.1180 | 0.1334 | +0.0155 | [+0.0085, +0.0223] | 65% |
+| gt_std_val | 0.1721 | 0.1721 | -- | -- | -- |
+| pred_std_val | 0.1384 | 0.1418 | -- | -- | -- |
+
+All four CIs exclude zero.
+
+**The gain is not bought with blandness.** `pred_std` *rose* (0.1384 ->
+0.1418, against gt 0.1721) while RMSE fell. This is the opposite of the
+unseen-date failure mode, where lower error came from predicting flatter
+output. The model produces more variation *and* correlates better.
+
+**The key asymmetry: 96% vs 69%.** The spectral degradation is more
+consistent than the correlation gain. The DEM worsens log-PSD RMSE on
+essentially every patch while improving pattern placement on only about
+two-thirds. Reading: the DEM branch injects broad *low-frequency* terrain
+structure almost everywhere; it lands correctly often enough to lift
+ZNCC on most patches, but systematically tilts the power spectrum,
+because it supplies relief rather than fine-scale roughness. Fine-scale
+roughness -- what the LiDAR target actually consists of -- remains
+unrecovered. This is consistent with the Rayleigh/Fraunhofer argument
+above: C-band backscatter responds to cm-scale surface texture, which
+carries little information about meter-scale relief, and handing the
+model the relief directly does not manufacture the missing fine scales.
+
+**Open, and decisive: this is in-region only.** The DEM is static and
+informative within the same spatial blocks the model trained on. A model
+that learned "read the DEM, mostly ignore the SAR" would produce exactly
+this table. In-region validation cannot distinguish that from genuine
+improvement. The test that can is Cambridge Bay: `09` scored ZNCC 0.0051
+there with `pred_std` ~4x `gt_std`. Requires ArcticDEM patches extracted
+for the Cambridge Bay LiDAR patches, then `pcrtc/13` re-run with the DEM
+checkpoint and `DemBoundModel`. Not yet done.
+
+**Training note.** `09`'s best val came at **epoch 93/100**, with val
+wandering 0.0137-0.0174 throughout and rising streaks up to 3 epochs
+long. Early val movement in these runs carries no signal; do not stop a
+run before ~epoch 80. The DEM run converged much faster early (epoch-1
+val 0.0153 vs `09`'s 0.0264; `09` needed 7 epochs to reach 0.0153) --
+itself consistent with the DEM giving immediately usable structure.
