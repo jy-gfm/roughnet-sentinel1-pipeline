@@ -1331,7 +1331,10 @@ than a smaller sample; subsampled to 400 (seed 42, ~7x Tuktoyaktuk's own
 
 **Finding 1 -- spatial correlation collapses.** ZNCC drops to
 essentially zero (0.0064), a similar magnitude of collapse to `08`'s
-unseen-date Tuktoyaktuk test (0.52 to 0.01). Because Cambridge Bay's
+unseen-date Tuktoyaktuk test (originally reported as 0.52 to 0.01, but
+that number was against `06`'s leaky checkpoint -- see the corrected
+0.2344 to -0.0052 result in "`pcrtc/08` unseen-date test, corrected"
+below; the collapse pattern holds either way). Because Cambridge Bay's
 test data carries both a new-region confound *and* the same
 cross-season confound `08` isolated, this single test cannot cleanly
 attribute the collapse to region generalization alone -- both are
@@ -1623,3 +1626,51 @@ not just a physics argument from the literature. Self-contained analysis,
 reuses existing LiDAR and Sentinel-1 patch data already on disk -- no new
 acquisition or training needed. Not yet implemented; a candidate next
 step if time remains after the write-up.
+
+## `pcrtc/08` unseen-date test, corrected (2026-09-09)
+
+Same fix pattern as `pcrtc/07`: `08`'s unseen-date generalization test
+was originally run against `06`'s checkpoint (pre-leakage-fix), reporting
+ZNCC collapsing from 0.52 to 0.01. Fixed (`9d03ad8`, `7f36d6f`) to load
+`09`'s checkpoint and reconstruct its spatial-block split; also fixed a
+crash in the overlap-severity diagnostic cell, which assumed some
+overlapping pairs would exist to characterize -- with the leakage-free
+split, there are legitimately zero, which the original cell didn't
+handle.
+
+**Corrected result** (`09`'s in-region validation vs. genuinely new
+Sentinel-1 imagery ~1 year after the LiDAR survey, same season/ice
+conditions, ~25 patches):
+
+| metric | 09 (in-region) | unseen date |
+|---|---|---|
+| RMSE (m) | 0.1945 | 0.2055 |
+| bias (m) | -0.0013 | -0.0007 |
+| sigma_error (%) | 22.73 | 51.79 |
+| normal_angle_error (deg) | 1.989 | 1.885 |
+| JSD | 0.1180 | 0.2871 |
+| PSD RMSE | 1.3092 | 1.2966 |
+| ZNCC | 0.2344 | **-0.0052** |
+| gt_std | 0.1721 | 0.1798 |
+| pred_std | 0.1384 | **0.0884** |
+
+**The collapse holds even for the corrected, much more modest model** --
+this isn't an artifact of `06`'s inflated/overfit leaky training. The
+leakage-fixed model, with a real but modest in-region ZNCC of 0.23, still
+drops to essentially zero on imagery from a genuinely new acquisition
+date. Temporal generalization (new dates, same region) is a real,
+separate limitation from both the spatial-leakage issue and the
+region-generalization issue (Cambridge Bay).
+
+**A specific, different failure mode from Cambridge Bay's, worth
+contrasting directly.** Cambridge Bay: `pred_std` (0.316) was ~4x
+*larger* than `gt_std` (0.083) -- the model hallucinated Tuktoyaktuk-style
+roughness onto genuinely flatter terrain. Here: `pred_std` (0.088) is
+*half* of `gt_std` (0.180) -- the model goes bland/conservative on
+unfamiliar-date imagery instead of over-confident. Same underlying
+architecture, two different unfamiliarity axes (region vs. acquisition
+date), two opposite failure directions -- worth stating explicitly in the
+write-up rather than collapsing both into a generic "generalizes poorly."
+The reconstruction grid supports this qualitatively: predicted patches
+show visibly less contrast/texture than GT across all six example
+patches, consistent with the halved `pred_std`.
