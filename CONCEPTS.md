@@ -1810,3 +1810,64 @@ curves nor the metric CIs caught this. What caught it was printing the
 within-patch std of the conditioning input and comparing it to the target.
 Verify that a new input carries variance on the scale of the target before
 attributing any result to it.
+
+## Dataset integrity audit (dem_unet/01), 2026-09-10
+
+Independent audit of the Tuktoyaktuk dataset and its train/val split.
+Deliberately recomputes the split from raw patch geometry rather than
+importing from `09`/`03`, so a bug in the split logic cannot hide behind
+its own passing assert.
+
+**Verdict: no contamination.**
+
+| Check | Result |
+|---|---|
+| Split reproduces from raw geometry | PASS -- 534/255/887, independently |
+| Single LiDAR CRS | PASS -- EPSG:32608 throughout |
+| Train/val geometric overlap | PASS -- 0 of 255 |
+| Duplicate LiDAR arrays across split | PASS -- 0 groups (0 anywhere in the dataset) |
+| Duplicate S1 stacks across split | PASS -- 0 groups |
+| Train/val id sets disjoint | PASS -- 0 shared |
+| All patch files present | PASS -- 0 incomplete |
+| Regions disjoint | PASS -- 27.35 deg separation |
+| Degenerate validation targets | PASS -- 0 near-flat, 0 under 50% valid |
+| S1 conditioning carries variance | PASS -- median 2.200 dB within-patch |
+| DEM conditioning carries variance | **FAIL -- ratio 0.024, confirms inert** |
+
+**The headline number for the write-up: 100% of the 1676 patches overlap
+at least one neighbour.** Not "patches may overlap" -- every single one
+does. A random patch-level split was therefore *guaranteed* to leak, and
+the block split is load-bearing rather than precautionary. This is the
+sentence that justifies the split design in Methods, and it is a measured
+fact rather than a caution.
+
+**Two caveats to state honestly rather than bury.**
+
+1. **23 validation patches (9%) lie within 150m of a training patch,
+   minimum 128m.** No shared pixels -- check 2 confirms zero overlap --
+   but terrain at that range is spatially autocorrelated. Cause: the
+   buffer drops patches whose *centroid* is within 150m of a *block
+   boundary*, which does not guarantee 150m *edge-to-edge* separation
+   between patches sitting in adjacent blocks. Bounded and disclosed, not
+   worth a retrain at this stage.
+2. **7 S1 acquisition dates serve both splits.** Unavoidable in a
+   single-region study: the split isolates *space*, not time. This is
+   precisely what motivates the unseen-date experiment (`pcrtc/08`), so
+   it strengthens the design narrative rather than undermining it.
+
+**Check 7 initially reported a FAIL that was a bug in the check.** It
+looked the unseen-date evaluation patch ids up in the *training* S1
+directory and reported the 7 training dates as "shared" -- comparing the
+training dates against themselves, a failure that would fire regardless of
+the data. `pcrtc/08` does not read its unseen-date imagery from `S1_DIR`
+at all; it fetches new scenes from Planetary Computer at runtime, centred
+one year after the survey with a +/-30 day window. April 2024 training
+imagery against a March-May 2025 window cannot overlap: the test is
+date-disjoint by construction. Check rewritten to verify that structurally.
+
+**Method note.** The audit exists because two defects in this project were
+invisible to every conventional signal -- loss curves, parameter counts,
+metric confidence intervals. Both were caught by looking at the *data*
+rather than the training: comparing patch geometry, and comparing the
+within-patch variance of each conditioning input against the target's.
+Check 10/10b encodes the second lesson permanently.
