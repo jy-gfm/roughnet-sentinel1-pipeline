@@ -1967,3 +1967,51 @@ replicates and every metric on record were trained on this split. Altering
 it would invalidate every comparison in the study. Recorded here as a
 quantified limitation and an obvious future-work line: revisit the
 block-size/buffer trade with the training-set size as an explicit term.
+
+## Seed variance measured: 0.262 +/- 0.026 ZNCC over three runs (2026-09-11)
+
+`dem_unet/06` retrained `09` on the identical split changing only the
+initialisation seed. With the inert-DEM run counting as a third replicate
+(its conditioning branch carried no information, so it differs from `09`
+only by initialisation plus ~21K dead parameters), there are now three
+runs of the same configuration.
+
+| run | ZNCC | RMSE | psd_rmse | jsd | pred_std |
+|---|---|---|---|---|---|
+| `09`, seed 42 | 0.2344 | 0.1945 | 1.3092 | 0.1180 | 0.1384 |
+| replicate, seed 43 | 0.2645 | 0.2084 | 1.2662 | 0.0891 | 0.1699 |
+| inert-DEM | 0.2866 | 0.1894 | 1.6886 | 0.1334 | 0.1418 |
+| **mean** | **0.2618** | 0.1974 | 1.4213 | 0.1135 | 0.1500 |
+| **sample sd** | **0.0262** | -- | -- | -- | -- |
+| **range** | **0.0522** | 0.0190 | **0.4224** | 0.0443 | 0.0315 |
+
+Seed 43 also reached a *better* validation loss than `09` (0.013161 at
+epoch 68 vs 0.013706 at epoch 93), consistent with its higher ZNCC.
+
+**`09`'s 0.2344 is the lowest of the three.** Reporting it alone as the
+headline reports the unluckiest draw. The defensible statement is
+**0.262 +/- 0.026 (n=3, range 0.234-0.287)** -- a measurement with its
+uncertainty, not an inflation.
+
+**The metadata advantage survives, and is stronger than the single-run
+comparison suggested.** Against `pcrtc/10`'s baseline (0.1867, n=1):
+single-run gap +0.048 (at the floor), seed-mean gap **+0.075** -- larger
+than the entire observed seed range. Caveat honestly: the baseline has one
+run, so this is not fully symmetric evidence.
+
+**The DEM findings are now fully explained as variance.** Its 0.2866 is
+the top of the seed range. And `psd_rmse` varies by **0.4224** across
+seeds, which swallows the DEM's "+0.3794 degradation on 96% of patches"
+entirely. Both the ZNCC gain and the spectral degradation are withdrawn on
+the same grounds.
+
+**What is untouched.** Every generalisation result sits at essentially
+zero -- unseen date -0.0052, cross-region 0.0051, EW -0.0066 -- an order
+of magnitude below the 0.052 threshold. The central finding that skill
+does not transfer is unaffected by seed variance.
+
+**Threshold for the write-up.** Quote both: sd 0.026 and range 0.052 over
+three runs. Differences between single-run configurations smaller than
+~0.05 ZNCC are not claimed as effects. Note also that `psd_rmse` and `jsd`
+are *more* seed-sensitive than ZNCC in relative terms, so spectral and
+distributional claims need the same caution.
