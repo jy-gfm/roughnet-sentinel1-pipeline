@@ -1675,7 +1675,7 @@ The reconstruction grid supports this qualitatively: predicted patches
 show visibly less contrast/texture than GT across all six example
 patches, consistent with the halved `pred_std`.
 
-## DEM conditioning (dem_unet/02): helps placement, hurts the spectrum (2026-09-09)
+## DEM conditioning (dem_unet/03): helps placement, hurts the spectrum (2026-09-09)
 
 **What was built.** `DEMConditionalUNet` subclasses Tessa's
 `ConditionalUNet` and adds a small static-DEM branch: a 2-layer conv
@@ -1798,7 +1798,7 @@ project should not be treated as meaningful without multiple seeds.
   a low-frequency-injection effect. The low-frequency reading in the
   section above is withdrawn -- there was no low-frequency content to
   inject.
-- `dem_unet/03`'s Part C verdict text assumes the DEM carried information
+- `dem_unet/04`'s Part C verdict text assumes the DEM carried information
   and reads wrongly; the numbers are still valid as a cross-region
   run-variance measurement.
 - A meaningful version of this experiment needs a DEM *of the ice*. For
