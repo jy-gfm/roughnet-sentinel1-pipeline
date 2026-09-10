@@ -1922,7 +1922,7 @@ so any offset below ~10m is sub-pixel in the source regardless of how
 sharp a correlation peak looks. **All 1676 patches carry 7 temporal views;
 the model uses 3** (`CONTEXT_K = 3`), while Tessa's S2 reference
 checkpoint is `linear_k6_att_best.pth` -- k=6. That is a live confound in
-every S1-vs-S2 comparison in this study, and `dem_unet/09` tests it.
+every S1-vs-S2 comparison in this study, and `pcrtc/14` tests it.
 
 **The figure to use.** The quicklook grid (`s1_lidar_quicklook.png`) and
 the polarisation panel (`s1_polarisation_check.png`) show sharp LiDAR
