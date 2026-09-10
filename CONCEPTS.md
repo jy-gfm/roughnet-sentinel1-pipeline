@@ -1871,3 +1871,60 @@ metric confidence intervals. Both were caught by looking at the *data*
 rather than the training: comparing patch geometry, and comparing the
 within-patch variance of each conditioning input against the target's.
 Check 10/10b encodes the second lesson permanently.
+
+## Registration ruled out, and a model-free measure of the information gap (2026-09-10)
+
+Two co-registration investigations, prompted by the Co-registration Shift
+Compensation method in Sebastianelli et al. (2022), Sec. IV-B.
+
+**First pass (`dem_unet/05`, model predictions vs LiDAR, +/-5m).** Mean
+ZNCC 0.2264 unshifted; best single global offset (dy=5, dx=0) at 0.2323,
+a gain of only +0.0059. But the surface spanned 0.205-0.230 with a clean
+monotone ramp in `dy` running into the top boundary, and the per-patch
+argmaxes piled on that edge -- the signature of an optimum outside the
+window. (The notebook's automatic verdict called this "scattered" because
+it tested for concentration but not for boundary pile-up; fixed.)
+
+**Second pass (`dem_unet/08`, S1 vs LiDAR directly, +/-20m, no model).**
+A registration error lives in the data, so it can be measured between the
+conditioning and the target without a network. FFT cross-correlation,
+250 patches, CPU, seconds.
+
+| | \|corr\| at (0,0) | best over shifts | peak | surface range |
+|---|---|---|---|---|
+| raw VV dB vs LiDAR elevation | **0.2874** | 0.3119 | (-9, 0) | 0.1890 |
+| \|grad VV\| vs \|grad LiDAR\| | **0.0451** | 0.0451 | (1, 0) | 0.0122 |
+
+**Registration is ruled out.** The per-patch modal offset is exactly
+(0,0); the global peak at (-9,0) is **0.91 native SAR pixels** -- sub-pixel
+in the source and therefore not a resolvable displacement -- and it gains
+only +0.024 on a broad, shallow blob about 20m across, which is simply
+what a correlation against a ~10m-resolution field looks like. `05`'s ramp
+is a property of the model's *output*, not of the extraction.
+
+**The two rows are the finding.** Broad-scale structure is genuinely
+shared between backscatter and relief (0.287, model-free). Edge structure
+is not (0.045), and no alignment recovers it -- the gradient surface is
+flat to 0.012 and its per-patch argmaxes scatter into the search corners,
+i.e. noise. This is a direct measurement of the claim the discussion
+needs: the SAR carries the low frequencies and not the high ones.
+
+**Caveat for the write-up.** These are *absolute* per-patch correlations,
+so sign flips inflate them relative to a signed measure. Do not place
+0.287 beside the model's signed ZNCC of 0.2344 and conclude the model adds
+nothing -- they are not the same quantity. The 0.287-vs-0.045 contrast is
+safe because both are computed identically.
+
+**Resolution facts worth stating in Methods.** S1 patches are **26x26
+native** (~9.8 m/px) over a 256 m patch, bilinearly upsampled 9.8x to
+256x256 before the model sees them. One SAR pixel covers ~10 LiDAR pixels,
+so any offset below ~10m is sub-pixel in the source regardless of how
+sharp a correlation peak looks. **All 1676 patches carry 7 temporal views;
+the model uses 3** (`CONTEXT_K = 3`), while Tessa's S2 reference
+checkpoint is `linear_k6_att_best.pth` -- k=6. That is a live confound in
+every S1-vs-S2 comparison in this study, and `dem_unet/09` tests it.
+
+**The figure to use.** The quicklook grid (`s1_lidar_quicklook.png`) and
+the polarisation panel (`s1_polarisation_check.png`) show sharp LiDAR
+ridge and crack networks beneath amorphous 26x26 SAR speckle. The
+information mismatch is visible without reference to any metric.
