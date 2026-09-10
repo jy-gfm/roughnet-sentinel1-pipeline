@@ -1928,3 +1928,42 @@ every S1-vs-S2 comparison in this study, and `pcrtc/14` tests it.
 the polarisation panel (`s1_polarisation_check.png`) show sharp LiDAR
 ridge and crack networks beneath amorphous 26x26 SAR speckle. The
 information mismatch is visible without reference to any metric.
+
+## Why the spatial-block split discards 887 of 1676 patches (2026-09-10)
+
+The split keeps 789 patches (534 train / 255 val) and drops **887 as
+buffer -- 53% of the dataset**. That is a striking fraction and an
+examiner will ask about it, so it belongs in Methods as a defended design
+choice rather than an oddity.
+
+**It is exactly what the rule implies.** Patches whose *centroid* falls
+within `BUFFER_M = 150` m of a `BLOCK_SIZE_M = 1024` m block boundary are
+dropped. The surviving interior of each block is therefore a square of
+side `1024 - 2*150 = 724` m, and
+
+    (724 / 1024)^2 = 0.707^2 = 0.50
+
+so half the block area is buffer. Observed: 789/1676 = 47% kept against
+50% predicted, the small shortfall being non-uniform centroid spacing.
+Nothing is malfunctioning.
+
+**Why 150 m.** Patches are 256 m across, so half-width 128 m. For a patch
+in one block to be guaranteed not to overlap one in the adjacent block,
+each centroid must sit at least 128 m back from the shared boundary; 150 m
+adds a 22 m margin. The audit confirms the rule works as intended: minimum
+edge-to-edge separation between any validation and training patch is
+128 m, with zero overlaps.
+
+**The cost driver is the block size, not the buffer.** 300 m of buffer out
+of 1024 m is 29% per axis. At `BLOCK_SIZE_M = 2048` the same buffer costs
+only 15% per axis, keeping ~73% of patches instead of 47% -- more than
+doubling the training set. The trade is a lumpier assignment: fewer, larger
+blocks mean fewer independent units to shuffle, so the train/val split
+becomes coarser and more sensitive to which blocks happen to fall in
+validation.
+
+**Not changed, deliberately.** `09`'s checkpoint, the DEM run, the seed
+replicates and every metric on record were trained on this split. Altering
+it would invalidate every comparison in the study. Recorded here as a
+quantified limitation and an obvious future-work line: revisit the
+block-size/buffer trade with the training-set size as an explicit term.
