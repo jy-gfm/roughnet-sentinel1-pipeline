@@ -1745,3 +1745,68 @@ long. Early val movement in these runs carries no signal; do not stop a
 run before ~epoch 80. The DEM run converged much faster early (epoch-1
 val 0.0153 vs `09`'s 0.0264; `09` needed 7 epochs to reach 0.0153) --
 itself consistent with the DEM giving immediately usable structure.
+
+### CORRECTION (2026-09-10): the DEM was inert -- the gain above is run variance
+
+**Do not cite the DEM interpretation in the section above.** The reasoning
+was sound given what was known; the input was not what it was assumed to
+be. Original text preserved for the record.
+
+**What was measured.** Within-patch DEM relief, all patches, both regions:
+
+| | Tuktoyaktuk (1676) | Cambridge Bay (2101) |
+|---|---|---|
+| DEM within-patch std, median | 0.004 m | 0.003 m (mean) |
+| DEM std 5-95% | 0.000 - 0.005 m | -- |
+| LiDAR within-patch std, median | 0.158 m | -- |
+| DEM/LiDAR median ratio | **0.02** | -- |
+| Patches with DEM std < 0.05 m | **100%** | -- |
+| 50-patch sample elevation range | -6.7 to -6.4 m | -30.9 to -30.9 m |
+
+**Why.** ArcticDEM is a *land* elevation model built from summer
+stereo-optical imagery. The LiDAR patches are April surveys over sea ice
+and frozen coastal water, where ArcticDEM has no surface to measure and
+carries a constant water-level value. The two constants are just the
+geoid-ellipsoid separation at each site (~-6.5 m at Tuktoyaktuk, ~-30.9 m
+at Cambridge Bay, the latter far lower because of the Hudson Bay gravity
+low). They are sea level, not patch elevation.
+
+**Mechanically the branch was dead.** `dem_arr - dem_arr.mean()` on a
+constant field is exactly zero, so `dem_encoder` saw zeros and emitted its
+bias terms: a constant feature map, identical for every patch. The branch
+contributed a fixed offset and no information.
+
+**Therefore the +0.0522 ZNCC is not a DEM effect.** The `+ DEM` model is
+`09` retrained with ~21K extra (effectively inert) parameters, a constant
+bias field, and a different weight initialisation. The paired bootstrap
+CIs were correct that the two *models* differ; they measured sampling
+variability across patches and say nothing about variability between
+training runs, which is what this difference actually is.
+
+**The one thing genuinely gained: a run-to-run variance estimate.** Two
+near-identical models on the identical split, differing only in
+initialisation (plus an inert branch), land **0.05 ZNCC apart** on the
+same 255 validation patches. Caveat it properly: this is a single pair, so
+one draw from the distribution of run-to-run differences, not a rigorous
+standard deviation -- it indicates the scale, nothing more. Even as an
+order of magnitude it matters, because the in-region result is 0.2344:
+differences below ~0.05 ZNCC between configurations anywhere in this
+project should not be treated as meaningful without multiple seeds.
+
+**Consequences.**
+- The `psd_rmse` degradation on 96% of patches is *also* run variance, not
+  a low-frequency-injection effect. The low-frequency reading in the
+  section above is withdrawn -- there was no low-frequency content to
+  inject.
+- `dem_unet/03`'s Part C verdict text assumes the DEM carried information
+  and reads wrongly; the numbers are still valid as a cross-region
+  run-variance measurement.
+- A meaningful version of this experiment needs a DEM *of the ice*. For
+  deforming sea ice no static product provides that, which is a real
+  limitation rather than a missing dataset.
+
+**Method note worth keeping.** Neither the parameter count nor the loss
+curves nor the metric CIs caught this. What caught it was printing the
+within-patch std of the conditioning input and comparing it to the target.
+Verify that a new input carries variance on the scale of the target before
+attributing any result to it.
