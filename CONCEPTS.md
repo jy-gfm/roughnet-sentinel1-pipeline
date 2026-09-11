@@ -2015,3 +2015,45 @@ three runs. Differences between single-run configurations smaller than
 ~0.05 ZNCC are not claimed as effects. Note also that `psd_rmse` and `jsd`
 are *more* seed-sensitive than ZNCC in relative terms, so spectral and
 distributional claims need the same caution.
+
+## k=7 temporal context: confound removed, gap unchanged (2026-09-11)
+
+`pcrtc/14` retrained `09` with all seven Sentinel-1 acquisitions instead of
+three. Motivation: Tessa's S2 reference checkpoint is `linear_k6` -- six
+views -- so every S1-vs-S2 comparison in this study had given radar half
+the temporal context of the baseline it was measured against.
+
+| metric | k=3 (3 seeds) | k=7 | outside the k=3 range? |
+|---|---|---|---|
+| zncc | 0.2344 / 0.2645 / 0.2866 | 0.2878 | barely -- at the edge |
+| rmse_m | 0.189 - 0.208 | **0.2564** | far outside (worse) |
+| sigma_error_pct | 21.0 - 22.7 | **55.46** | far outside (worse) |
+| pred_std_val | 0.138 - 0.170 | **0.2486** | far outside (44% over gt 0.1721) |
+| psd_rmse | 1.266 - 1.689 | **1.1040** | outside (better) |
+| jsd | 0.089 - 0.133 | 0.1444 | just outside (worse) |
+
+**The ZNCC gain is NOT established.** The notebook's own verdict said
+"EXCEEDS the noise floor", but it compared against `09` alone (0.2344, the
+*lowest* of the three k=3 runs) using a floor derived from a single pair.
+Against the seed mean of 0.2618, k=7 is **+0.026 -- exactly one standard
+deviation** -- and 0.2878 sits barely above 0.2866, the top of the k=3
+range. Floor logic in `14`/`15`/`16` has been rewritten to compare against
+the full seed distribution rather than one run.
+
+**What k=7 really did is inflate output variance.** Predicted std rises to
+0.2486 against a ground truth of 0.1721: the model over-produces roughness
+by 44%. That extra texture improves the power spectrum (psd_rmse 1.104,
+below the whole k=3 range) while badly damaging magnitude accuracy (RMSE
++0.062 on 98% of patches, sigma error more than doubled). ZNCC is
+normalised, so it is blind to precisely the scale error that dominates
+here -- a good illustration of why the metric suite is reported in full.
+
+Same signature as the Cambridge Bay failure: more roughness than the ground
+actually has.
+
+**The result that matters for the argument.** With seven views the radar
+model now has *more* temporal context than the optical baseline's six, and
+ZNCC remains ~0.26-0.29 against optical's ~0.74-0.78. **More temporal
+context does not close the gap.** The k=3-vs-k=6 asymmetry was never the
+explanation, and one more alternative account is ruled out by experiment
+rather than by argument.
