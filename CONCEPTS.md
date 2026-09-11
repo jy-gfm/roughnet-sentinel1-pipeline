@@ -2057,3 +2057,47 @@ ZNCC remains ~0.26-0.29 against optical's ~0.74-0.78. **More temporal
 context does not close the gap.** The k=3-vs-k=6 asymmetry was never the
 explanation, and one more alternative account is ruled out by experiment
 rather than by argument.
+
+## The 2x2 completed on the honest split: the interaction survives (2026-09-11)
+
+`pcrtc/15` and `pcrtc/16` fill in the two cells that were never retrained
+after the leakage correction. All four now exist on the identical
+spatial-block split.
+
+| ZNCC | zero metadata | real metadata |
+|---|---|---|
+| repeated channels | 0.1867 (`10`) | **0.2618** (`09`, 3 seeds) |
+| native 2-channel | 0.2068 (`15`) | 0.2012 (`16`) |
+
+**Single-factor comparisons, against the measured seed spread (s.d. 0.026,
+range 0.052):**
+
+| factor | held fixed | change | verdict |
+|---|---|---|---|
+| metadata | repeated channels | +0.075 (~2.9 s.d.) | **real** |
+| metadata | native channels | -0.006 | nothing |
+| channels | zero metadata | +0.020 (0.77 s.d.) | inside noise |
+| channels | real metadata | **-0.061** (2.3 s.d., outside range) | **real, harmful** |
+
+`16` vs `09` is a clean single-factor comparison -- they differ in channel
+handling only.
+
+**The interaction replicates on clean data.** The leaky 2x2 said metadata
+alone was best (0.519) and combining it with native channels was worse
+(0.219). The corrected 2x2 says the same: 0.2618 against 0.2012. Same
+shape, much smaller magnitudes. The original configuration choice was
+correct and can now be defended from leakage-free numbers rather than
+contaminated ones.
+
+**Caveat.** Only the metadata cell has three seeds; the other three are
+single runs compared against a spread measured on one configuration.
+
+**The amplitude/placement trade-off holds across the whole table.** `15`
+has the best power spectrum of any model trained in this project (1.104 in
+`14`, 0.9724 here -- the lowest), `16` the best amplitude calibration
+(sigma error 20.64%, below the entire k=3 seed range), and `09` the best
+placement. Configurations with zero-filled metadata or native channels
+calibrate magnitude and spectrum better; real metadata places structure
+better. No configuration is best on everything, which is the same pattern
+the reference study reports when it notes that sharper reconstructions
+sometimes scored worse on error metrics.
