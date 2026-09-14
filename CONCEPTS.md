@@ -2101,3 +2101,46 @@ calibrate magnitude and spectrum better; real metadata places structure
 better. No configuration is best on everything, which is the same pattern
 the reference study reports when it notes that sharper reconstructions
 sometimes scored worse on error metrics.
+
+## Sentinel-2 winter saturation: the claim narrows (2026-09-11)
+
+`pcrtc/17` retested the finding that motivated the study. The original
+check measured the **8-bit `visual` preview composite** and found
+`valid_frac = 0.000` across ten March-May scenes. That product clips long
+before 12-bit reflectance does, so it could not establish that the
+reflectance bands a model consumes carry no information.
+
+**Measured on B02/B03/B04/B08 over twelve winter scenes:**
+
+| | value |
+|---|---|
+| Winter median within-tile reflectance s.d. | **0.01745** |
+| Winter pixels above 0.9 reflectance | **89.4%** |
+| Summer control within-tile s.d. | 0.00099 |
+
+**The summer control is invalid and its ratio must be ignored.** A summer
+within-tile s.d. of 0.001 is not a usable scene: over this AOI the summer
+surface is largely open water, which is dark and near-uniform in
+reflectance. The notebook's printed verdict ("winter carries comparable
+structure to summer") is an artifact of dividing by a featureless control.
+A guard has been added to `17` that flags this rather than concluding from
+it.
+
+**What holds.** The reflectance bands are **not** flat -- there is real
+within-tile variation -- so the broad claim that optical imagery carries
+*no usable signal* in this season is not supported and must be removed
+from the abstract and introduction. What is supported is narrower: the
+standard visual composite is fully saturated, and 89% of reflectance
+pixels sit above 0.9, i.e. near the top of the sensor's response. Whether
+the residual variation carries roughness information was not tested, and
+cannot be with the reference checkpoint corrupted.
+
+**This does not weaken the motivation.** Cloud obscuration and polar night
+are established, citable limitations of optical sensing in the Arctic and
+are sufficient on their own. The saturation observation remains a genuine
+finding, correctly scoped to the product on which it was measured.
+
+**Method note, third instance of the same lesson.** Leakage, the inert DEM
+and now this were all caught by measuring the *input* rather than trusting
+a downstream signal. In each case the original evidence looked convincing
+and was answering a slightly different question than the one asked.
