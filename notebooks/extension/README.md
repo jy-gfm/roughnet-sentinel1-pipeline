@@ -17,7 +17,7 @@ notebooks run from this folder unchanged.
 ## Run order (remaining)
 1. `27` Section 8 (last two cells) — confidence deciles and figure.
 2. `29` — Run All (resumable; seed 43 can be skipped if time is short).
-3. `30` (reference split, zone 13) — only if `input_data/s2_patches_tuk/s2_patch_*/region.json` exists.
+3. `30_reference_split` — zone 13 (reconstructed from the reference's x-binning rule; no `region.json` on the workstation) held out, no buffer; leading configuration; ~1.5 h.
 
 Not run, and why: Pond Inlet (no Sentinel-1 within a year of the survey, HH-only);
 Tuk + Cambridge Bay joint training (Cambridge Bay radar is 402-409 days after its LiDAR,
